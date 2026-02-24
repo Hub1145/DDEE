@@ -389,8 +389,17 @@ def _compute_analysis(df: pd.DataFrame, symbol: str, interval_name: str) -> Anal
 #  DERIV DATA FETCHER
 # ─────────────────────────────────────────────
 
+_CANDLE_CACHE = {} # (symbol, granularity) -> (timestamp, df)
+
 async def _fetch_candles(symbol: str, granularity: int, count: int = 300) -> pd.DataFrame:
     """Fetch OHLC candles from Deriv WebSocket API."""
+    cache_key = (symbol, granularity)
+    now = time.time()
+    if cache_key in _CANDLE_CACHE:
+        ts, cached_df = _CANDLE_CACHE[cache_key]
+        if now - ts < granularity: # Use cache if still in same candle period
+            return cached_df
+
     end_time   = int(time.time())
     start_time = end_time - granularity * count
 
@@ -403,22 +412,32 @@ async def _fetch_candles(symbol: str, granularity: int, count: int = 300) -> pd.
         "count":         count,
     }
 
-    async with websockets.connect(DERIV_WS_URL) as ws:
-        await ws.send(json.dumps(request))
-        response = json.loads(await ws.recv())
+    try:
+        async with websockets.connect(DERIV_WS_URL) as ws:
+            await ws.send(json.dumps(request))
+            response = json.loads(await ws.recv())
+    except Exception as e:
+        if cache_key in _CANDLE_CACHE:
+            return _CANDLE_CACHE[cache_key][1]
+        raise ValueError(f"Deriv Connection error: {e}")
 
     if "error" in response:
+        if cache_key in _CANDLE_CACHE:
+            return _CANDLE_CACHE[cache_key][1]
         raise ValueError(f"Deriv API error: {response['error']['message']}")
 
     candles = response.get("candles", [])
     if not candles:
+        if cache_key in _CANDLE_CACHE:
+            return _CANDLE_CACHE[cache_key][1]
         raise ValueError(f"No candle data returned for symbol: {symbol}")
 
     df = pd.DataFrame(candles)
-    # Ensure epoch is preserved as column if needed, or use index
     df["epoch_dt"] = pd.to_datetime(df["epoch"], unit="s")
     df.set_index("epoch_dt", inplace=True)
     df = df[["open", "high", "low", "close", "epoch"]].astype(float)
+
+    _CANDLE_CACHE[cache_key] = (now, df)
     return df
 
 

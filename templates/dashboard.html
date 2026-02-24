@@ -289,9 +289,15 @@
                         </div>
                         <div class="form-text">Uncheck for % of balance.</div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Max Daily Loss (%)</label>
-                        <input type="number" class="form-control" id="configMaxDailyLoss">
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Max Daily Loss (%)</label>
+                            <input type="number" class="form-control" id="configMaxDailyLoss">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Max Daily Profit (%)</label>
+                            <input type="number" class="form-control" id="configMaxDailyProfit">
+                        </div>
                     </div>
                     <hr>
                     <div class="row g-2 mb-3">
@@ -331,6 +337,7 @@
                             <div class="col-4">
                                 <label class="form-label">Small TF</label>
                                 <select class="form-select" id="configStrat7SmallTF">
+                                    <option value="OFF">OFF</option>
                                     <option value="60">1m</option>
                                     <option value="120">2m</option>
                                     <option value="180">3m</option>
@@ -340,6 +347,7 @@
                             <div class="col-4">
                                 <label class="form-label">Mid TF</label>
                                 <select class="form-select" id="configStrat7MidTF">
+                                    <option value="OFF">OFF</option>
                                     <option value="300" selected>5m</option>
                                     <option value="900">15m</option>
                                     <option value="1800">30m</option>
@@ -349,6 +357,7 @@
                             <div class="col-4">
                                 <label class="form-label">High TF</label>
                                 <select class="form-select" id="configStrat7HighTF">
+                                    <option value="OFF">OFF</option>
                                     <option value="3600" selected>1h</option>
                                     <option value="7200">2h</option>
                                     <option value="14400">4h</option>
