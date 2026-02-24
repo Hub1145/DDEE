@@ -133,28 +133,29 @@ class StrategyHandler:
         if metrics.get('over_adr'): return None
         if time.time() - cache['timestamp'] > 65: return None
 
-        rec_small = cache['small'].summary['RECOMMENDATION'] if cache['small'] else "NEUTRAL"
-        rec_mid = cache['mid'].summary['RECOMMENDATION'] if cache['mid'] else "NEUTRAL"
-        rec_high = cache['high'].summary['RECOMMENDATION'] if cache['high'] else "NEUTRAL"
+        label = metrics.get('label', "NEUTRAL")
 
+        # Pullback entry needs flip detection
+        rec_small = cache['small'].summary['RECOMMENDATION'] if cache['small'] else "NEUTRAL"
         prev_small = sd.get('last_strat7_small_rec')
         sd['last_strat7_small_rec'] = rec_small
 
-        # Only proceed if small TF is not OFF
-        if self.bot.config.get('strat7_small_tf') == 'OFF':
-            # If small is OFF, we might use Mid/High alignment
-             if "BUY" in rec_high and "BUY" in rec_mid: return 'buy'
-             if "SELL" in rec_high and "SELL" in rec_mid: return 'sell'
-             return None
-
-        if "BUY" in rec_high and "BUY" in rec_mid:
+        if label in ["QUICK_BUY", "ALIGNED_BUY"]:
+            self.bot.log(f"Strategy 7: {label} entry BUY on {symbol}")
+            return 'buy'
+        elif label in ["QUICK_SELL", "ALIGNED_SELL"]:
+            self.bot.log(f"Strategy 7: {label} entry SELL on {symbol}")
+            return 'sell'
+        elif label == "PULLBACK_BUY":
+            # Enter when Small flips back to trend
             if "BUY" in rec_small and (prev_small is None or "BUY" not in prev_small):
-                self.bot.log(f"Strategy 7: Pullback entry BUY on {symbol}")
+                self.bot.log(f"Strategy 7: Pullback entry BUY on {symbol} (1m flipped back)")
                 return 'buy'
-        elif "SELL" in rec_high and "SELL" in rec_mid:
+        elif label == "PULLBACK_SELL":
             if "SELL" in rec_small and (prev_small is None or "SELL" not in prev_small):
-                self.bot.log(f"Strategy 7: Pullback entry SELL on {symbol}")
+                self.bot.log(f"Strategy 7: Pullback entry SELL on {symbol} (1m flipped back)")
                 return 'sell'
+
         return None
 
     def _process_intelligence_strategy(self, symbol, sd, strat_key):

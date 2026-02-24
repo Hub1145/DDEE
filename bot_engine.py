@@ -9,7 +9,7 @@ import websocket
 import pandas as pd
 import numpy as np
 import ta
-from deriv_ta import DerivTA, Interval
+from handlers.ta_handler import DerivTA, Interval
 from handlers.screener_handler import ScreenerHandler
 from handlers.strategy_handler import StrategyHandler
 from handlers.utils import (
@@ -803,38 +803,38 @@ class TradingBotEngine:
             # Increment trade count for hourly cap
             sd['hourly_trade_count'] = sd.get('hourly_trade_count', 0) + 1
 
-        elif strat_key == 'strategy_5':
+        elif strat_key in ['strategy_5', 'strategy_6', 'strategy_7']:
             metrics = self.screener_data.get(symbol, {})
             contract_type = self.config.get('contract_type', 'rise_fall')
             is_multiplier = (contract_type == 'multiplier')
 
             if not is_multiplier:
-                # Rise & Fall Constraints
-                # 1. Late Entry Penalty
-                if sd['ltf_candles']:
-                    last_c = sd['ltf_candles'][-1]
-                    body = abs(last_c['close'] - last_c['open'])
-                    df_ltf = pd.DataFrame(sd['ltf_candles'])
-                    avg_atr = ta.volatility.AverageTrueRange(df_ltf['high'], df_ltf['low'], df_ltf['close']).average_true_range().mean()
-                    if body > (avg_atr * 0.3):
-                        self.log(f"Strategy 5 Scalp CANCELLED: Late entry (body {body:.4f} > 30% avg ATR {avg_atr*0.3:.4f})")
+                # Rise & Fall Constraints for Strategy 5
+                if strat_key == 'strategy_5':
+                    # 1. Late Entry Penalty
+                    if sd['ltf_candles']:
+                        last_c = sd['ltf_candles'][-1]
+                        body = abs(last_c['close'] - last_c['open'])
+                        df_ltf = pd.DataFrame(sd['ltf_candles'])
+                        avg_atr = ta.volatility.AverageTrueRange(df_ltf['high'], df_ltf['low'], df_ltf['close']).average_true_range().mean()
+                        if body > (avg_atr * 0.3):
+                            self.log(f"Strategy 5 Scalp CANCELLED: Late entry (body {body:.4f} > 30% avg ATR {avg_atr*0.3:.4f})")
+                            return
+
+                    # 2. Volatility Freeze (v4.0 Instrument Specific)
+                    atr_1m = metrics.get('atr_1m', 0)
+                    atr_24h = metrics.get('atr_24h', 0)
+                    if atr_24h > 0 and atr_1m < (atr_24h * 0.1):
+                        self.log(f"Strategy 5 Scalp PAUSED: Volatility too low (1m ATR {atr_1m} < 10% of 24h ATR {atr_24h})")
+                        return
+                    elif atr_1m < 0.00001: # Fail-safe absolute baseline
+                        self.log(f"Strategy 5 Scalp PAUSED: Volatility too low (1m ATR: {atr_1m})")
                         return
 
-                # 2. Volatility Freeze (v4.0 Instrument Specific)
-                atr_1m = metrics.get('atr_1m', 0)
-                atr_24h = metrics.get('atr_24h', 0)
-                if atr_24h > 0 and atr_1m < (atr_24h * 0.1):
-                    self.log(f"Strategy 5 Scalp PAUSED: Volatility too low (1m ATR {atr_1m} < 10% of 24h ATR {atr_24h})")
-                    return
-                elif atr_1m < 0.00001: # Fail-safe absolute baseline
-                    self.log(f"Strategy 5 Scalp PAUSED: Volatility too low (1m ATR: {atr_1m})")
-                    return
-
                 # Dynamic expiry based on trigger timeframe
-                # We simplified this in _update_screener's suggested_expiry
                 duration_minutes = metrics.get('expiry_min', 5)
                 duration_seconds = duration_minutes * 60
-                expiry_label = f"Scalp Expiry: {duration_minutes}m"
+                expiry_label = f"Dynamic Expiry: {duration_minutes}m"
             else:
                 expiry_label = "Multiplier Position"
         elif strat['expiry_type'] == 'eod':

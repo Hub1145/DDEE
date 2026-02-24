@@ -5,7 +5,7 @@ import ta
 import numpy as np
 from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor
-from deriv_ta import DerivTA, Interval
+from handlers.ta_handler import DerivTA, Interval
 from handlers.utils import (
     calculate_supertrend, calculate_fractals, calculate_order_blocks,
     calculate_fvg, detect_macd_divergence, calculate_adr
@@ -430,6 +430,26 @@ class ScreenerHandler:
                 df_mid = h_mid.get_dataframe()
                 mid_atr = ta.volatility.AverageTrueRange(df_mid['high'], df_mid['low'], df_mid['close']).average_true_range().iloc[-1]
 
+            # Identify highest and lowest enabled timeframes
+            enabled_analyses = []
+            if tf_small: enabled_analyses.append(('small', a_small))
+            if tf_mid: enabled_analyses.append(('mid', a_mid))
+            if tf_high: enabled_analyses.append(('high', a_high))
+
+            highest_analysis = enabled_analyses[-1][1] if enabled_analyses else None
+            lowest_analysis = enabled_analyses[0][1] if enabled_analyses else None
+
+            # All enabled Buy/Sell check
+            all_buy = all("BUY" in a.summary['RECOMMENDATION'] for name, a in enabled_analyses) if enabled_analyses else False
+            all_sell = all("SELL" in a.summary['RECOMMENDATION'] for name, a in enabled_analyses) if enabled_analyses else False
+
+            # Quick entry/exit logic
+            quick_buy = False
+            quick_sell = False
+            if highest_analysis and lowest_analysis:
+                quick_buy = "STRONG_BUY" in highest_analysis.summary['RECOMMENDATION'] and "BUY" in lowest_analysis.summary['RECOMMENDATION']
+                quick_sell = "STRONG_SELL" in highest_analysis.summary['RECOMMENDATION'] and "SELL" in lowest_analysis.summary['RECOMMENDATION']
+
             # Pullback Detection
             is_pullback_buy = ("BUY" in rec_high if tf_high else True) and \
                               ("BUY" in rec_mid if tf_mid else True) and \
@@ -440,18 +460,12 @@ class ScreenerHandler:
                                (("BUY" in rec_small or "NEUTRAL" in rec_small) if tf_small else False)
 
             label = "NEUTRAL"
-            if is_pullback_buy: label = "PULLBACK_BUY"
+            if quick_buy: label = "QUICK_BUY"
+            elif quick_sell: label = "QUICK_SELL"
+            elif all_buy: label = "ALIGNED_BUY"
+            elif all_sell: label = "ALIGNED_SELL"
+            elif is_pullback_buy: label = "PULLBACK_BUY"
             elif is_pullback_sell: label = "PULLBACK_SELL"
-            else:
-                aligned_buy = ("BUY" in rec_high if tf_high else True) and \
-                              ("BUY" in rec_mid if tf_mid else True) and \
-                              ("BUY" in rec_small if tf_small else True)
-                aligned_sell = ("SELL" in rec_high if tf_high else True) and \
-                               ("SELL" in rec_mid if tf_mid else True) and \
-                               ("SELL" in rec_small if tf_small else True)
-
-                if aligned_buy: label = "ALIGNED_BUY"
-                elif aligned_sell: label = "ALIGNED_SELL"
 
             # Suggested expiry for Strategy 7 (based on mid TF)
             suggested_expiry = 5
@@ -459,6 +473,10 @@ class ScreenerHandler:
                 if tf_mid.value >= 3600: suggested_expiry = 60
                 elif tf_mid.value >= 900: suggested_expiry = 15
                 elif tf_mid.value >= 300: suggested_expiry = 5
+
+            # Reduce expiry for quick entries
+            if quick_buy or quick_sell:
+                suggested_expiry = max(1, suggested_expiry // 2)
 
             self.bot.screener_data[symbol] = {
                 'confidence': round(confidence, 1),
