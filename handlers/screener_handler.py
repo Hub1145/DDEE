@@ -31,6 +31,8 @@ class ScreenerHandler:
                 return self.analyze_crossover_strategy(symbol, 2, "3m", 3600)
             elif strat_key == 'strategy_3':
                 return self.analyze_crossover_strategy(symbol, 3, "1m", 900)
+            elif strat_key == 'strategy_4':
+                return self.analyze_strategy_4(symbol)
             return None
         except Exception as e:
             logging.error(f"Screener error for {symbol}: {e}")
@@ -367,6 +369,43 @@ class ScreenerHandler:
             logging.error(f"Strategy 7 analysis error for {symbol}: {e}")
             return None
 
+    def analyze_strategy_4(self, symbol):
+        """Strategy 4: SNR Reversal + Echo Confirmation"""
+        try:
+            sd = self.bot.symbol_data.get(symbol, {})
+            df1m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1m"), manager.loop).result()
+
+            fcast_prices, correlation = calculate_echo_forecast(df1m)
+
+            # Simple Echo Direction
+            echo_dir = "NEUTRAL"
+            if fcast_prices:
+                echo_dir = "CALL" if fcast_prices[-1] > df1m['close'].iloc[-1] else "PUT"
+
+            confidence = int(correlation * 100)
+            fcast_data = {
+                'forecast_prices': fcast_prices,
+                'correlation': correlation
+            }
+            expiry = predict_expiry_v5(symbol, 'strategy_4', 1, 5, confidence, fcast_data, df1m, direction=echo_dir)
+
+            data = {
+                'signal': "WAIT",
+                'direction': echo_dir,
+                'desc': f"Echo Corr: {correlation:.2f} | PA Pattern: {check_price_action_patterns(sd.get('ltf_candles', []))}",
+                'confidence': confidence,
+                'threshold': 50,
+                'expiry_min': expiry,
+                'trend_rec': echo_dir,
+                'last_update': time.time()
+            }
+            self.bot.screener_data[symbol] = data
+            self.bot.emit('screener_update', {'symbol': symbol, 'data': data})
+            return data
+        except Exception as e:
+            logging.error(f"Strategy 4 screener error: {e}")
+            return None
+
     def analyze_crossover_strategy(self, symbol, strat_num, ta_interval, htf_sec):
         ta_signal = get_ta_signal(symbol, ta_interval)
         indicators = get_ta_indicators(symbol, ta_interval)
@@ -379,11 +418,22 @@ class ScreenerHandler:
         if htf_open:
             direction = "CALL" if price > htf_open else "PUT"
 
+        # Echo Confirmation
+        df_ltf = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, ta_interval), manager.loop).result()
+        fcast_prices, correlation = calculate_echo_forecast(df_ltf)
+
+        echo_conf = "WAIT"
+        if fcast_prices:
+            fcast_final = fcast_prices[-1]
+            if direction == "CALL" and fcast_final > price: echo_conf = "Confirmed UP"
+            elif direction == "PUT" and fcast_final < price: echo_conf = "Confirmed DOWN"
+            else: echo_conf = "Not Confirmed"
+
         data = {
             'signal': ta_signal,
             'direction': direction,
-            'desc': f"HTF Open: {htf_open} | TA ({ta_interval}): {ta_signal}",
-            'confidence': 50,
+            'desc': f"HTF Open: {htf_open} | Echo: {echo_conf} ({correlation:.2f})",
+            'confidence': int(correlation * 100),
             'threshold': 0,
             'expiry_min': htf_sec // 60,
             'trend_rec': ta_signal,

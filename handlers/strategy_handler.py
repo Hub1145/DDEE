@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timezone, timedelta
 from handlers.utils import (
     calculate_supertrend, detect_macd_divergence, check_price_action_patterns,
-    score_reversal_pattern, calculate_snr_zones
+    score_reversal_pattern, calculate_snr_zones, calculate_echo_forecast
 )
 from handlers.ta_handler import get_ta_signal
 
@@ -149,12 +149,24 @@ class StrategyHandler:
                 elif last_price >= htf_open and current_price < htf_open:
                     is_cross_down = True
 
+        # Echo Forecast Confirmation
+        echo_confirmed = False
+        ltf_df = pd.DataFrame(sd.get('ltf_candles', []))
+        if not ltf_df.empty:
+            fcast_prices, correlation = calculate_echo_forecast(ltf_df)
+            if fcast_prices and correlation > 0.5:
+                fcast_final = fcast_prices[-1]
+                if is_cross_up and fcast_final > current_price:
+                    echo_confirmed = True
+                elif is_cross_down and fcast_final < current_price:
+                    echo_confirmed = True
+
         # Signal Filtering
         signal = None
-        if is_cross_up:
+        if is_cross_up and echo_confirmed:
             if ta_signal == "BUY" or (ta_signal == "STRONG_BUY" and is_candle_close):
                 signal = 'buy'
-        elif is_cross_down:
+        elif is_cross_down and echo_confirmed:
             if ta_signal == "SELL" or (ta_signal == "STRONG_SELL" and is_candle_close):
                 signal = 'sell'
 
@@ -219,6 +231,18 @@ class StrategyHandler:
                         signal = 'sell'
                         z['total_lifetime_touches'] = z.get('total_lifetime_touches', 0) + 1
                         break
+
+        # Echo Forecast Confirmation for SNR
+        if signal:
+            ltf_df = pd.DataFrame(sd.get('ltf_candles', []))
+            if not ltf_df.empty:
+                fcast_prices, correlation = calculate_echo_forecast(ltf_df)
+                if fcast_prices and correlation > 0.5:
+                    fcast_final = fcast_prices[-1]
+                    if signal == 'buy' and fcast_final <= current_price:
+                        signal = None # Echo doesn't confirm reversal UP
+                    elif signal == 'sell' and fcast_final >= current_price:
+                        signal = None # Echo doesn't confirm reversal DOWN
 
         if signal:
             self.bot.log(f"Strategy 4 triggered {signal} for {symbol}")
