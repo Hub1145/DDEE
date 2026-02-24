@@ -7,7 +7,8 @@ import ta
 from concurrent.futures import ThreadPoolExecutor
 from handlers.ta_handler import get_ta_signal, get_ta_indicators, fetch_candles, manager
 from handlers.utils import (
-    calculate_snr_zones, check_price_action_patterns, score_reversal_pattern
+    calculate_snr_zones, check_price_action_patterns, score_reversal_pattern,
+    predict_expiry_v5
 )
 
 class ScreenerHandler:
@@ -120,11 +121,13 @@ class ScreenerHandler:
                 desc = "Triple EMA Alignment DOWN"
 
             df1m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1m"), manager.loop).result()
-            expiry = self._get_smart_expiry(df1m, 1, 60)
 
             indicators = get_ta_indicators(symbol, "5m")
             df5m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "5m"), manager.loop).result()
             trend, momentum, volatility, structure = self._calculate_scores(symbol, indicators, df5m)
+
+            confidence = 75 # Standard for alignment
+            expiry = predict_expiry_v5(symbol, 'strategy_5', 1, 60, confidence, {}, df1m)
 
             atr_1m = 0
             if not df1m.empty:
@@ -134,7 +137,7 @@ class ScreenerHandler:
                 'signal': signal,
                 'direction': direction,
                 'desc': desc,
-                'confidence': 75,
+                'confidence': confidence,
                 'threshold': 72,
                 'expiry_min': expiry,
                 'atr_1m': round(atr_1m, 4),
@@ -172,11 +175,13 @@ class ScreenerHandler:
                 desc = "RSI Overbought + Bearish Trend"
 
             df1m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1m"), manager.loop).result()
-            expiry = self._get_smart_expiry(df1m, 1, 15)
 
             indicators = get_ta_indicators(symbol, "15m")
             df15m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "15m"), manager.loop).result()
             trend, momentum, volatility, structure = self._calculate_scores(symbol, indicators, df15m)
+
+            confidence = 65
+            expiry = predict_expiry_v5(symbol, 'strategy_6', 1, 15, confidence, {}, df1m)
 
             atr_1m = 0
             if not df1m.empty:
@@ -186,7 +191,7 @@ class ScreenerHandler:
                 'signal': signal,
                 'direction': direction,
                 'desc': desc,
-                'confidence': 65,
+                'confidence': confidence,
                 'threshold': 60,
                 'expiry_min': expiry,
                 'atr_1m': round(atr_1m, 4),
@@ -275,12 +280,19 @@ class ScreenerHandler:
             indicators = get_ta_indicators(symbol, ref_tf)
             trend, momentum, volatility, structure = self._calculate_scores(symbol, indicators, df_ref)
 
+            confidence = 80 if signal != "WAIT" else 50
+            if "STRONG" in str(active_recs): confidence = 90
+
+            df_ltf = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, s_tf or "1m"), manager.loop).result()
+            expiry = predict_expiry_v5(symbol, 'strategy_7', 1, 60, confidence,
+                                      {'small': rec_small, 'mid': rec_mid, 'high': rec_high}, df_ltf)
+
             atr_val = 0
             if not df_ref.empty:
                 atr_val = ta.volatility.AverageTrueRange(df_ref['high'], df_ref['low'], df_ref['close']).average_true_range().iloc[-1]
 
             data = {
-                'confidence': 80 if signal != "WAIT" else 50,
+                'confidence': confidence,
                 'label': label,
                 'direction': direction,
                 'signal': signal,
@@ -288,7 +300,7 @@ class ScreenerHandler:
                 'summary_small': rec_small,
                 'summary_mid': rec_mid,
                 'summary_high': rec_high,
-                'expiry_min': 5,
+                'expiry_min': expiry,
                 'atr': round(atr_val, 4),
                 'trend': trend, 'momentum': momentum, 'volatility': volatility, 'structure': structure,
                 'last_update': time.time()

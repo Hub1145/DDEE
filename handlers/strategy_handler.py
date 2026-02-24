@@ -77,6 +77,19 @@ class StrategyHandler:
             return
 
         signal = data.get('signal') # 'BUY', 'SELL', or 'WAIT'
+
+        sd = self.bot.symbol_data.get(symbol, {})
+
+        # Strategy 7 Cooling (1-TF Mode)
+        if strat_key == 'strategy_7':
+            config = self.bot.config
+            off_count = [config.get('strat7_small_tf'), config.get('strat7_mid_tf'), config.get('strat7_high_tf')].count('OFF')
+            if off_count == 2: # 1-TF Mode
+                last_sig = sd.get('last_strat7_signal')
+                if signal == last_sig and signal != "WAIT":
+                    return # Still same signal, wait for change
+                sd['last_strat7_signal'] = signal
+
         if signal not in ['BUY', 'SELL']:
             return
 
@@ -85,9 +98,17 @@ class StrategyHandler:
             if c['symbol'] == symbol:
                 return # Already have a trade
 
-        # Execute
+        # Execute with smart metadata
         self.bot.log(f"Strategy {strat_key} triggered {signal} for {symbol} based on screener.")
-        self.bot._execute_trade(symbol, 'buy' if signal == 'BUY' else 'sell')
+
+        # Pass smart metadata to execute_trade
+        metadata = {
+            'confidence': data.get('confidence', 50),
+            'expiry_min': data.get('expiry_min', 5),
+            'atr': data.get('atr_1m') or data.get('atr') or 0
+        }
+
+        self.bot._execute_trade(symbol, 'buy' if signal == 'BUY' else 'sell', metadata=metadata)
 
     def _process_strategy_1(self, symbol, is_candle_close):
         self._generic_crossover_strategy(symbol, is_candle_close, 1, "15m", 86400)

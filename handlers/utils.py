@@ -233,3 +233,97 @@ def score_reversal_pattern(symbol, pattern, candles):
         if prev_range > 0 and (prev_body / prev_range) > 0.6: score += 1
 
     return score
+
+def get_smart_multiplier(atr_pct, base_multiplier=100):
+    """
+    Scale multiplier based on relative volatility (ATR as % of price).
+    Low Volatility -> Higher Multiplier.
+    High Volatility -> Lower Multiplier.
+    """
+    # Typical ATR% for indices might be 0.05% to 0.5%
+    # If ATR% is 0.1%, use base.
+    # If ATR% is 0.5%, use base/2.
+    # If ATR% is 0.02%, use base*2.
+
+    if atr_pct == 0: return base_multiplier
+
+    # Target volatility index: 0.1% (0.001)
+    scale = 0.001 / atr_pct
+    multiplier = base_multiplier * scale
+
+    # Constrain to sensible limits (e.g. 10x to 500x)
+    return int(max(10, min(500, multiplier)))
+
+def predict_expiry_v5(symbol, strategy_key, ltf_min, htf_min, confidence, signals, df_ltf):
+    """
+    Engine to predict expiry time based on strategy, timeframe, ATR and confidence.
+    Signals is a dict: {'small': 'BUY', 'mid': 'STRONG_BUY', 'high': 'BUY'} (for example)
+    """
+    atr = 0
+    if df_ltf is not None and not df_ltf.empty:
+        atr_series = ta.volatility.average_true_range(df_ltf['high'], df_ltf['low'], df_ltf['close'], window=14)
+        atr = atr_series.iloc[-1]
+
+    # Default is the Mid TF
+    base_expiry = 5
+    if ltf_min: base_expiry = ltf_min * 3 # e.g. 1m -> 3m
+
+    if strategy_key == 'strategy_7':
+        s = signals.get('small', 'NEUTRAL')
+        m = signals.get('mid', 'NEUTRAL')
+        h = signals.get('high', 'NEUTRAL')
+
+        # 2 Timeframes active (Small & Mid)
+        if m != 'OFF' and s != 'OFF' and h == 'OFF':
+            if "STRONG" in m and "STRONG" not in s:
+                # Shorter expiry (1m to 4m)
+                base_expiry = max(1, min(4, int(4 * (confidence/100))))
+            else:
+                base_expiry = 5 # 5m
+
+        # 3 Timeframes active
+        elif h != 'OFF' and m != 'OFF' and s != 'OFF':
+            if "STRONG" in h and "STRONG" in m:
+                # Very short (< 5m)
+                base_expiry = max(1, min(4, int(5 * (1 - confidence/100))))
+            elif "STRONG" in h:
+                # 5m to 20m
+                base_expiry = max(5, min(20, int(20 * (1 - confidence/100))))
+            else:
+                # Match but not strong -> Less than 1h (e.g. 30m)
+                base_expiry = 30
+
+    # Fine-tune based on ATR
+    # If ATR is high, price reaches targets faster -> shorter expiry
+    if atr > 0 and df_ltf is not None and not df_ltf.empty:
+        avg_atr = ta.volatility.average_true_range(df_ltf['high'], df_ltf['low'], df_ltf['close'], window=50).mean()
+        if avg_atr > 0:
+            ratio = atr / avg_atr
+            if ratio > 1.5: # High volatility
+                base_expiry = max(1, int(base_expiry * 0.7))
+            elif ratio < 0.5: # Low volatility
+                base_expiry = int(base_expiry * 1.3)
+
+    return max(1, base_expiry)
+
+def get_smart_targets(entry_price, side, atr, confidence):
+    """
+    Calculate TP/SL targets based on ATR and confidence level.
+    A higher confidence level might allow for a wider TP (letting winners run).
+    """
+    if atr == 0:
+        return None, None
+
+    is_long = side == 'long'
+
+    # Base risk is 1.5x ATR
+    sl_dist = 1.5 * atr
+
+    # TP is scaled by confidence (1:2 to 1:5 risk reward)
+    rr = 2 + (3 * (confidence / 100))
+    tp_dist = sl_dist * rr
+
+    tp_price = (entry_price + tp_dist) if is_long else (entry_price - tp_dist)
+    sl_price = (entry_price - sl_dist) if is_long else (entry_price + sl_dist)
+
+    return tp_price, sl_price

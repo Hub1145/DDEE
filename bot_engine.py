@@ -15,7 +15,8 @@ from handlers.strategy_handler import StrategyHandler
 from handlers.utils import (
     calculate_supertrend, calculate_fractals, calculate_order_blocks,
     calculate_fvg, detect_macd_divergence, calculate_adr,
-    calculate_snr_zones, check_price_action_patterns, score_reversal_pattern
+    calculate_snr_zones, check_price_action_patterns, score_reversal_pattern,
+    get_smart_multiplier, get_smart_targets
 )
 
 class TradingBotEngine:
@@ -616,8 +617,33 @@ class TradingBotEngine:
             side = c.get('side')
             is_long = side == 'long'
 
-            # --- DECISION MAKING POSITION ENGINE v4.0 ---
+            # --- INTELLIGENT POSITION ENGINE v5.0 ---
             strat_key = self.config.get('active_strategy')
+
+            # Expert Intelligent Monitoring for Strategies 5, 6, 7
+            if strat_key in ['strategy_5', 'strategy_6', 'strategy_7']:
+                metrics = self.screener_data.get(symbol, {})
+                current_signal = metrics.get('signal') # 'BUY', 'SELL', 'WAIT'
+
+                # Check for Signal Flip (Opposite Direction)
+                opposite_signal = 'SELL' if is_long else 'BUY'
+
+                if current_signal == opposite_signal:
+                    # Signal flipped against us. Expert move: Close early if losing to preserve capital.
+                    if c.get('pnl', 0) < 0:
+                        self.log(f"Intelligent EXIT for {symbol} ({cid}): Signal flip to {current_signal} while losing.")
+                        self._close_contract(cid)
+                        continue
+                    # If profit is positive but signal flipped, maybe we wait for a bit?
+                    # User said: "hold if signal is still in support, if not close".
+                    # Flipped signal is NOT in support.
+                    else:
+                        self.log(f"Intelligent EXIT for {symbol} ({cid}): Signal flip to {current_signal} (Taking profit).")
+                        self._close_contract(cid)
+                        continue
+
+                # If signal is WAIT (Neutral), we hold as long as PnL is okay or wait for expiry.
+                # If PnL is dropping significantly and signal is neutral, we might consider closing.
 
             if strat_key == 'strategy_1' and current_price:
                 sd = self.symbol_data.get(symbol, {})
@@ -641,20 +667,20 @@ class TradingBotEngine:
                                 self._close_contract(cid)
                                 continue
 
-            if (strat_key == 'strategy_5' or strat_key == 'strategy_7') and current_price:
+            if (strat_key in ['strategy_5', 'strategy_6', 'strategy_7']) and current_price:
                 sd = self.symbol_data.get(symbol, {})
                 df_h = pd.DataFrame(sd.get('htf_candles', []))
                 df_m15 = pd.DataFrame(sd.get('m15_candles', []))
 
-                if not df_h.empty and len(df_h) >= 20 and not df_m15.empty and len(df_m15) >= 20:
+                if not df_h.empty and len(df_h) >= 20:
                     exit_reason = None
 
-                    # 1. Divergence Hard Exit (1H)
+                    # 1. Macro Exit: Divergence Hard Exit (1H)
                     div = detect_macd_divergence(df_h)
                     if (is_long and div == -1) or (not is_long and div == 1):
-                        exit_reason = "MACD Divergence detected"
+                        exit_reason = "MACD Divergence detected against position"
 
-                    # 2. Multiplier Management
+                    # 2. Expert Multiplier Management (Compound Winners)
                     is_multiplier = c.get('contract_type') in ['MULTUP', 'MULTDOWN']
                     if is_multiplier and not exit_reason:
                         entry_price = c.get('entry_price')
@@ -663,32 +689,23 @@ class TradingBotEngine:
                         if entry_price:
                             profit_pips = (current_price - entry_price) if is_long else (entry_price - current_price)
 
-                            # v4.0 "Free Ride" Protocol: Trailing Zone via Fractals/ATR
+                            # "Free Ride" Protocol: Trailing Zone once in profit
+                            # We use 1.5x ATR as the 'unlocked' state for trailing
                             if profit_pips >= 1.5 * atr_1h and not c.get('is_freeride'):
-                                self.log(f"Multiplier FREE RIDE for {symbol}: 1.5 ATR profit reached. Moving SL to structural safety zone.")
-
-                                # Find recent 1m Fractal for structural safety
-                                trailing_sl = entry_price
-                                if sd.get('fractal_lows') and is_long:
-                                    trailing_sl = sd['fractal_lows'][-1]
-                                elif sd.get('fractal_highs') and not is_long:
-                                    trailing_sl = sd['fractal_highs'][-1]
-                                else:
-                                    # Fallback to Entry + ATR buffer if no fractal
-                                    buffer = atr_1h * 0.2
-                                    trailing_sl = (entry_price + buffer) if is_long else (entry_price - buffer)
-
-                                c['sl_price'] = trailing_sl
+                                self.log(f"Multiplier FREE RIDE for {symbol}: Unlocked structural trailing.")
                                 c['is_freeride'] = True
 
-                            # SuperTrend Trailing (15m)
+                            # If in Free Ride, aggressively trail SL to lock in exponential growth
                             if c.get('is_freeride'):
-                                _, st_dir = calculate_supertrend(df_m15)
-                                if (is_long and st_dir.iloc[-1] == -1) or (not is_long and st_dir.iloc[-1] == 1):
-                                    exit_reason = "15m SuperTrend reversal (Trailing)"
+                                # Trail SL at 1.0x ATR distance from current price
+                                new_sl = (current_price - 1.0 * atr_1h) if is_long else (current_price + 1.0 * atr_1h)
+
+                                # Only move SL in our favor
+                                if c.get('sl_price') is None or (is_long and new_sl > c['sl_price']) or (not is_long and new_sl < c['sl_price']):
+                                    c['sl_price'] = new_sl
 
                     if exit_reason:
-                        self.log(f"Strategy {strat_key[-1]} Engine EXIT for {symbol} ({cid}): {exit_reason}.")
+                        self.log(f"Intelligent EXIT for {symbol} ({cid}): {exit_reason}.")
                         self._close_contract(cid)
                         continue
 
@@ -763,7 +780,7 @@ class TradingBotEngine:
                 self.contracts[cid]['is_closing'] = True
                 self._close_contract(cid)
 
-    def _execute_trade(self, symbol, side):
+    def _execute_trade(self, symbol, side, metadata=None):
         # side is 'buy' or 'sell' from strategy
         internal_side = 'long' if side == 'buy' else 'short'
 
@@ -806,7 +823,7 @@ class TradingBotEngine:
             expiry_label = f"Expiry: {duration_seconds // 60}m {duration_seconds % 60}s"
 
         elif strat_key in ['strategy_5', 'strategy_6', 'strategy_7']:
-            metrics = self.screener_data.get(symbol, {})
+            metrics = metadata or self.screener_data.get(symbol, {})
             contract_type = self.config.get('contract_type', 'rise_fall')
             is_multiplier = (contract_type == 'multiplier')
 
@@ -824,19 +841,15 @@ class TradingBotEngine:
                             return
 
                     # 2. Volatility Freeze (v4.0 Instrument Specific)
-                    atr_1m = metrics.get('atr_1m', 0)
-                    atr_24h = metrics.get('atr_24h', 0)
-                    if atr_24h > 0 and atr_1m < (atr_24h * 0.1):
-                        self.log(f"Strategy 5 Scalp PAUSED: Volatility too low (1m ATR {atr_1m} < 10% of 24h ATR {atr_24h})")
-                        return
-                    elif atr_1m < 0.00001: # Fail-safe absolute baseline
-                        self.log(f"Strategy 5 Scalp PAUSED: Volatility too low (1m ATR: {atr_1m})")
+                    atr_1m = metrics.get('atr', 0) # metadata use 'atr'
+                    if atr_1m < 0.0000001: # Fail-safe absolute baseline
+                        self.log(f"Strategy 5 Scalp PAUSED: Volatility too low (ATR: {atr_1m})")
                         return
 
                 # Dynamic expiry based on trigger timeframe
                 duration_minutes = metrics.get('expiry_min', 5)
                 duration_seconds = duration_minutes * 60
-                expiry_label = f"Dynamic Expiry: {duration_minutes}m"
+                expiry_label = f"Smart Expiry: {duration_minutes}m"
             else:
                 expiry_label = "Multiplier Position"
         elif strat['expiry_type'] == 'eod':
@@ -906,24 +919,28 @@ class TradingBotEngine:
         is_multiplier = (strat_key in ['strategy_5', 'strategy_6', 'strategy_7'] and contract_type == 'multiplier')
 
         if is_multiplier:
-            # Use 5% of balance for multipliers
+            # Growth account strategy: 5% of balance or fixed amount
             if not self.config.get('use_fixed_balance'):
                 amount = max(0.35, round(self.account_balance * 0.05, 2))
 
-            # Multiplier tied to Volatility (ATR)
-            metrics = self.screener_data.get(symbol, {})
-            mult_val = metrics.get('multiplier', int(self.config.get('multiplier_value', 100)))
-
-            # TP/SL based on 1H ATR (Mode B: 1.5x ATR SL, 3.0x ATR TP)
-            atr_1h = metrics.get('atr', 1.0)
-            # We need to convert ATR-based price targets to USD profit/loss for multipliers
-            # Profit = (Price_Change / Entry_Price) * Multiplier * Stake
-            # So, Target_USD = (ATR_Multiple / Entry_Price) * Multiplier * Stake
+            # Smart Multiplier tied to Volatility (ATR %)
+            metrics = metadata or self.screener_data.get(symbol, {})
             entry_price = sd['last_tick']
-            sl_usd = ( (1.5 * atr_1h) / entry_price ) * mult_val * amount
-            tp_usd = ( (3.0 * atr_1h) / entry_price ) * mult_val * amount
+            atr = metrics.get('atr', 1.0)
+            atr_pct = atr / entry_price if entry_price else 0.001
 
-            self.log(f"Opening MULTIPLIER {side.upper()} on {symbol} | Stake: {amount} | Mult: {mult_val}x | ATR: {atr_1h}")
+            base_mult = int(self.config.get('multiplier_value', 100))
+            mult_val = get_smart_multiplier(atr_pct, base_mult)
+
+            # Smart TP/SL based on ATR and Confidence
+            confidence = metrics.get('confidence', 50)
+            tp_price, sl_price = get_smart_targets(entry_price, internal_side, atr, confidence)
+
+            # Convert targets to USD
+            sl_usd = abs((sl_price - entry_price) / entry_price) * mult_val * amount if entry_price else 0.1 * amount
+            tp_usd = abs((tp_price - entry_price) / entry_price) * mult_val * amount if entry_price else 0.2 * amount
+
+            self.log(f"Opening MULTIPLIER {side.upper()} on {symbol} | Stake: {amount} | Smart Mult: {mult_val}x | Confidence: {confidence}%")
 
             buy_request = {
                 "buy": 1,
