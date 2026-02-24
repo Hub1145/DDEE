@@ -90,3 +90,117 @@
 2026-02-24 12:07:39,190 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
 2026-02-24 12:07:49,979 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
 2026-02-24 12:08:00,980 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:08:11,982 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:08:23,008 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:08:33,980 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:08:44,982 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:08:55,983 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:09:06,986 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:09:17,991 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:09:28,988 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:09:39,986 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:09:50,986 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:10:02,006 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:10:13,213 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:10:23,986 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 13:32:44,619 - ERROR - WS Error: Connection to remote host was lost.
+2026-02-24 13:32:44,629 - ERROR - Connection to remote host was lost. - goodbye
+2026-02-24 13:32:44,631 - INFO - WS Connection Closed
+2026-02-24 13:32:49,920 - INFO - Websocket connected
+2026-02-24 13:32:49,923 - INFO - Deriv WebSocket connected.
+2026-02-24 13:32:50,321 - INFO - Authorization successful.
+2026-02-24 13:32:50,322 - INFO - Daily starting balance set: 326.15
+2026-02-24 13:32:56,132 - INFO - Strategy 7 update for R_100: NEUTRAL
+2026-02-24 13:32:59,439 - ERROR - Strategy 7 analysis error for R_100:
+Traceback (most recent call last):
+  File "/app/handlers/screener_handler.py", line 129, in update_strat7_analysis
+    if tf_small:
+                ^
+  File "/app/handlers/ta_handler.py", line 533, in get_analysis
+    ).result()
+      ^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+TimeoutError
+2026-02-24 13:33:06,474 - INFO - Strategy 7 update for R_100: NEUTRAL
+2026-02-24 13:33:17,438 - INFO - Strategy 7 update for R_100: NEUTRAL
+2026-02-24 13:33:28,437 - INFO - Strategy 7 update for R_100: NEUTRAL
+2026-02-24 13:33:39,438 - INFO - Strategy 7 update for R_100: NEUTRAL
+2026-02-24 13:33:51,608 - INFO - Bot started | Trading: OFF
+2026-02-24 13:33:51,609 - INFO - Screener background loop started
+2026-02-24 13:33:51,611 - INFO - History worker started
+2026-02-24 13:33:51,612 - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+2026-02-24 13:33:51,620 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.0.2:3000
+2026-02-24 13:33:51,620 - INFO - [33mPress CTRL+C to quit[0m
+2026-02-24 13:34:51,968 - INFO - Bot started | Trading: OFF
+2026-02-24 13:34:51,969 - INFO - Screener background loop started
+2026-02-24 13:34:51,971 - INFO - History worker started
+2026-02-24 13:34:51,971 - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+2026-02-24 13:34:51,977 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.0.2:3000
+2026-02-24 13:34:51,977 - INFO - [33mPress CTRL+C to quit[0m
+2026-02-24 13:34:52,610 - INFO - Strategy 7 update for R_100: NEUTRAL | WAIT | Expiry: 58m
+2026-02-24 13:35:03,037 - INFO - Strategy 7 update for R_100: NEUTRAL | WAIT | Expiry: 58m
+2026-02-24 13:35:14,036 - INFO - Strategy 7 update for R_100: NEUTRAL | WAIT | Expiry: 58m
+2026-02-24 13:35:26,707 - INFO - Bot started | Trading: OFF
+2026-02-24 13:35:26,708 - INFO - Screener background loop started
+2026-02-24 13:35:26,710 - INFO - History worker started
+2026-02-24 13:35:26,711 - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+2026-02-24 13:35:26,718 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.0.2:3000
+2026-02-24 13:35:26,718 - INFO - [33mPress CTRL+C to quit[0m
+2026-02-24 13:35:27,517 - INFO - Strategy 5 update for R_100: NEUTRAL | WAIT | Expiry: 16m
+2026-02-24 13:35:37,801 - INFO - Strategy 5 update for R_100: NEUTRAL | WAIT | Expiry: 16m
+2026-02-24 13:35:48,800 - INFO - Strategy 5 update for R_100: NEUTRAL | WAIT | Expiry: 16m
+2026-02-24 13:36:00,028 - INFO - Strategy 5 update for R_100: NEUTRAL | WAIT | Expiry: 16m
+2026-02-24 13:36:10,818 - INFO - Strategy 5 update for R_100: NEUTRAL | WAIT | Expiry: 16m
+2026-02-24 13:36:21,803 - INFO - Strategy 5 update for R_100: NEUTRAL | WAIT | Expiry: 16m
+2026-02-24 13:36:33,029 - INFO - Strategy 5 update for R_100: NEUTRAL | WAIT | Expiry: 16m
+2026-02-24 13:36:46,039 - INFO - Bot started | Trading: OFF
+2026-02-24 13:36:46,039 - INFO - Screener background loop started
+2026-02-24 13:36:46,041 - INFO - History worker started
+2026-02-24 13:36:46,041 - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+2026-02-24 13:36:46,046 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.0.2:3000
+2026-02-24 13:36:46,047 - INFO - [33mPress CTRL+C to quit[0m
+2026-02-24 13:37:01,421 - INFO - 127.0.0.1 - - [24/Feb/2026 13:37:01] "GET / HTTP/1.1" 200 -
+2026-02-24 13:37:01,483 - INFO - 127.0.0.1 - - [24/Feb/2026 13:37:01] "GET /static/js/app.js HTTP/1.1" 200 -
+2026-02-24 13:37:01,766 - INFO - 127.0.0.1 - - [24/Feb/2026 13:37:01] "GET /socket.io/?EIO=4&transport=polling&t=PoFtXCk HTTP/1.1" 200 -
+2026-02-24 13:37:01,775 - INFO - 127.0.0.1 - - [24/Feb/2026 13:37:01] "GET /api/config HTTP/1.1" 200 -
+2026-02-24 13:37:01,787 - INFO - Client connected: S2akcRfvN2bqOIFwAAAB
+2026-02-24 13:37:01,790 - INFO - 127.0.0.1 - - [24/Feb/2026 13:37:01] "POST /socket.io/?EIO=4&transport=polling&t=PoFtXDK&sid=dztf2v3oDcsOqB_ZAAAA HTTP/1.1" 200 -
+2026-02-24 13:37:01,806 - INFO - 127.0.0.1 - - [24/Feb/2026 13:37:01] "GET /socket.io/?EIO=4&transport=polling&t=PoFtXDR&sid=dztf2v3oDcsOqB_ZAAAA HTTP/1.1" 200 -
+2026-02-24 13:37:01,828 - INFO - 127.0.0.1 - - [24/Feb/2026 13:37:01] "GET /socket.io/?EIO=4&transport=polling&t=PoFtXDz&sid=dztf2v3oDcsOqB_ZAAAA HTTP/1.1" 200 -
+2026-02-24 13:37:08,592 - INFO - Client disconnected
+2026-02-24 13:37:08,594 - INFO - 127.0.0.1 - - [24/Feb/2026 13:37:08] "GET /socket.io/?EIO=4&transport=websocket&sid=dztf2v3oDcsOqB_ZAAAA HTTP/1.1" 200 -
+2026-02-24 13:37:43,220 - INFO - Bot started | Trading: OFF
+2026-02-24 13:37:43,221 - INFO - Screener background loop started
+2026-02-24 13:37:43,223 - INFO - History worker started
+2026-02-24 13:37:43,224 - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+2026-02-24 13:37:43,228 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.0.2:3000
+2026-02-24 13:37:43,229 - INFO - [33mPress CTRL+C to quit[0m
+2026-02-24 13:37:57,156 - INFO - 127.0.0.1 - - [24/Feb/2026 13:37:57] "GET / HTTP/1.1" 200 -
+2026-02-24 13:37:57,178 - INFO - 127.0.0.1 - - [24/Feb/2026 13:37:57] "GET /static/js/app.js HTTP/1.1" 200 -
+2026-02-24 13:37:57,321 - INFO - 127.0.0.1 - - [24/Feb/2026 13:37:57] "GET /socket.io/?EIO=4&transport=polling&t=PoFtkn0 HTTP/1.1" 200 -
+2026-02-24 13:37:57,325 - INFO - 127.0.0.1 - - [24/Feb/2026 13:37:57] "GET /api/config HTTP/1.1" 200 -
+2026-02-24 13:37:57,332 - INFO - Client connected: mz-4KbSKz-xtRA2kAAAB
+2026-02-24 13:37:57,333 - INFO - 127.0.0.1 - - [24/Feb/2026 13:37:57] "POST /socket.io/?EIO=4&transport=polling&t=PoFtknE&sid=QTEvWynxWmfrQbohAAAA HTTP/1.1" 200 -
+2026-02-24 13:37:57,339 - INFO - 127.0.0.1 - - [24/Feb/2026 13:37:57] "GET /socket.io/?EIO=4&transport=polling&t=PoFtknG&sid=QTEvWynxWmfrQbohAAAA HTTP/1.1" 200 -
+2026-02-24 13:37:57,346 - INFO - 127.0.0.1 - - [24/Feb/2026 13:37:57] "GET /socket.io/?EIO=4&transport=polling&t=PoFtknV&sid=QTEvWynxWmfrQbohAAAA HTTP/1.1" 200 -
+2026-02-24 13:38:05,501 - INFO - Client disconnected
+2026-02-24 13:38:05,503 - INFO - 127.0.0.1 - - [24/Feb/2026 13:38:05] "GET /socket.io/?EIO=4&transport=websocket&sid=QTEvWynxWmfrQbohAAAA HTTP/1.1" 200 -

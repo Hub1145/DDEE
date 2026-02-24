@@ -1,6 +1,7 @@
 import time
 import logging
 import pandas as pd
+import ta
 from concurrent.futures import ThreadPoolExecutor
 from handlers.ta_handler import DerivTA, Interval
 
@@ -23,10 +24,29 @@ class ScreenerHandler:
             logging.error(f"Screener error for {symbol}: {e}")
             return None
 
+    def _get_smart_expiry(self, df_ltf, ltf_min, htf_min):
+        """Calculate expiry based on volatility (ATR)."""
+        try:
+            if df_ltf is None or len(df_ltf) < 20:
+                return htf_min
+
+            atr_series = ta.volatility.AverageTrueRange(df_ltf['high'], df_ltf['low'], df_ltf['close'], window=14).average_true_range()
+            atr_current = atr_series.iloc[-1]
+            atr_avg = atr_series.rolling(50).mean().iloc[-1]
+
+            if not atr_current or not atr_avg:
+                return htf_min
+
+            vol_factor = atr_avg / atr_current
+            suggested = htf_min * vol_factor
+            final_expiry = max(ltf_min, min(htf_min * 3, int(round(suggested))))
+            return final_expiry
+        except:
+            return htf_min
+
     def analyze_strategy_5(self, symbol):
         """Strategy 5: Triple EMA Alignment (1m, 5m, 1h)"""
         try:
-            # We use 1m, 5m, 1h
             h1m = DerivTA(symbol=symbol, interval=Interval.INTERVAL_1_MINUTE)
             h5m = DerivTA(symbol=symbol, interval=Interval.INTERVAL_5_MINUTES)
             h1h = DerivTA(symbol=symbol, interval=Interval.INTERVAL_1_HOUR)
@@ -40,29 +60,38 @@ class ScreenerHandler:
             rec1h = a1h.summary['RECOMMENDATION']
 
             signal = "WAIT"
+            direction = "NEUTRAL"
             desc = "No alignment"
+            confidence = 0
 
-            # Use exact match for signal to allow skipping 'STRONG' if desired,
-            # but for Strat 5 alignment usually allows Strong.
-            # User didn't specify skipping strong for Strat 5.
             if "BUY" in rec1m and "BUY" in rec5m and "BUY" in rec1h:
                 signal = "BUY"
+                direction = "CALL"
                 desc = "Triple EMA Alignment UP"
+                confidence = 100
             elif "SELL" in rec1m and "SELL" in rec5m and "SELL" in rec1h:
                 signal = "SELL"
+                direction = "PUT"
                 desc = "Triple EMA Alignment DOWN"
+                confidence = 100
+
+            df1m = h1m.get_dataframe()
+            expiry = self._get_smart_expiry(df1m, 1, 15)
+            atr_1m = ta.volatility.AverageTrueRange(df1m['high'], df1m['low'], df1m['close'], window=14).average_true_range().iloc[-1]
 
             data = {
                 'signal': signal,
+                'direction': direction,
                 'desc': desc,
-                'expiry_min': 5,
+                'confidence': confidence,
+                'expiry_min': expiry,
+                'atr_1m': round(atr_1m, 4),
                 'ltf': rec1m,
                 'mtf': rec5m,
                 'htf': rec1h,
                 'last_update': time.time()
             }
             self.bot.screener_data[symbol] = data
-            logging.info(f"Strategy 5 update for {symbol}: {signal} ({rec1m}, {rec5m}, {rec1h})")
             self.bot.emit('screener_update', {'symbol': symbol, 'data': data})
             return data
         except Exception as e:
@@ -82,25 +111,37 @@ class ScreenerHandler:
             trend = a15m.summary['RECOMMENDATION']
 
             signal = "WAIT"
+            direction = "NEUTRAL"
             desc = f"RSI: {rsi:.1f}, Trend: {trend}"
+            confidence = 0
 
             if rsi < 30 and "BUY" in trend:
                 signal = "BUY"
+                direction = "CALL"
                 desc = "RSI Oversold + Bullish Trend"
+                confidence = 100
             elif rsi > 70 and "SELL" in trend:
                 signal = "SELL"
+                direction = "PUT"
                 desc = "RSI Overbought + Bearish Trend"
+                confidence = 100
+
+            df1m = h1m.get_dataframe()
+            expiry = self._get_smart_expiry(df1m, 1, 15)
+            atr_1m = ta.volatility.AverageTrueRange(df1m['high'], df1m['low'], df1m['close'], window=14).average_true_range().iloc[-1]
 
             data = {
                 'signal': signal,
+                'direction': direction,
                 'desc': desc,
-                'expiry_min': 2,
+                'confidence': confidence,
+                'expiry_min': expiry,
+                'atr_1m': round(atr_1m, 4),
                 'rsi': round(rsi, 2),
                 'trend': trend,
                 'last_update': time.time()
             }
             self.bot.screener_data[symbol] = data
-            logging.info(f"Strategy 6 update for {symbol}: {signal} (RSI: {rsi:.1f}, Trend: {trend})")
             self.bot.emit('screener_update', {'symbol': symbol, 'data': data})
             return data
         except Exception as e:
@@ -125,13 +166,17 @@ class ScreenerHandler:
             tf_high = val_to_interval(tf_high_val)
 
             a_small = a_mid = a_high = None
+            h_small = h_mid = h_high = None
 
             if tf_small:
-                a_small = DerivTA(symbol=symbol, interval=tf_small).get_analysis()
+                h_small = DerivTA(symbol=symbol, interval=tf_small)
+                a_small = h_small.get_analysis()
             if tf_mid:
-                a_mid = DerivTA(symbol=symbol, interval=tf_mid).get_analysis()
+                h_mid = DerivTA(symbol=symbol, interval=tf_mid)
+                a_mid = h_mid.get_analysis()
             if tf_high:
-                a_high = DerivTA(symbol=symbol, interval=tf_high).get_analysis()
+                h_high = DerivTA(symbol=symbol, interval=tf_high)
+                a_high = h_high.get_analysis()
 
             self.bot.strat7_cache[symbol] = {
                 'small': a_small,
@@ -144,7 +189,6 @@ class ScreenerHandler:
             rec_mid = a_mid.summary['RECOMMENDATION'] if a_mid else "OFF"
             rec_high = a_high.summary['RECOMMENDATION'] if a_high else "OFF"
 
-            # Confidence
             total_buy = (a_small.summary['BUY'] if a_small else 0) + \
                         (a_mid.summary['BUY'] if a_mid else 0) + \
                         (a_high.summary['BUY'] if a_high else 0)
@@ -159,69 +203,86 @@ class ScreenerHandler:
 
             confidence = ((total_buy - total_sell) / total_signals) * 100 if total_signals > 0 else 0
 
-            # Alignment Logic
             enabled = []
             if a_small: enabled.append(a_small)
             if a_mid: enabled.append(a_mid)
             if a_high: enabled.append(a_high)
 
             label = "NEUTRAL"
+            direction = "NEUTRAL"
+            signal = "WAIT"
+
             if len(enabled) == 1:
-                # Requirement: Skip STRONG signals if only one timeframe is used
                 rec = enabled[0].summary['RECOMMENDATION']
-                if rec == "BUY": label = "ALIGNED_BUY"
-                elif rec == "SELL": label = "ALIGNED_SELL"
+                if rec == "BUY":
+                    label = "ALIGNED_BUY"
+                    direction = "CALL"
+                    signal = "BUY"
+                elif rec == "SELL":
+                    label = "ALIGNED_SELL"
+                    direction = "PUT"
+                    signal = "SELL"
             elif len(enabled) > 1:
                 all_buy = all("BUY" in a.summary['RECOMMENDATION'] for a in enabled)
                 all_sell = all("SELL" in a.summary['RECOMMENDATION'] for a in enabled)
 
-                # Quick entry (Highest Strong, Lowest normal)
                 quick_buy = False
                 quick_sell = False
                 if a_high and a_small:
                     quick_buy = "STRONG_BUY" in a_high.summary['RECOMMENDATION'] and "BUY" in a_small.summary['RECOMMENDATION']
                     quick_sell = "STRONG_SELL" in a_high.summary['RECOMMENDATION'] and "SELL" in a_small.summary['RECOMMENDATION']
 
-                if quick_buy: label = "QUICK_BUY"
-                elif quick_sell: label = "QUICK_SELL"
-                elif all_buy: label = "ALIGNED_BUY"
-                elif all_sell: label = "ALIGNED_SELL"
+                if quick_buy:
+                    label = "QUICK_BUY"
+                    direction = "CALL"
+                    signal = "BUY"
+                elif quick_sell:
+                    label = "QUICK_SELL"
+                    direction = "PUT"
+                    signal = "SELL"
+                elif all_buy:
+                    label = "ALIGNED_BUY"
+                    direction = "CALL"
+                    signal = "BUY"
+                elif all_sell:
+                    label = "ALIGNED_SELL"
+                    direction = "PUT"
+                    signal = "SELL"
 
-            # Dynamic Expiry matching the highest active timeframe
             enabled_tfs = []
             if tf_small: enabled_tfs.append(tf_small.value)
             if tf_mid: enabled_tfs.append(tf_mid.value)
             if tf_high: enabled_tfs.append(tf_high.value)
 
             if enabled_tfs:
-                max_tf = max(enabled_tfs)
-                if max_tf >= 86400: suggested_expiry = 1440
-                elif max_tf >= 14400: suggested_expiry = 240
-                elif max_tf >= 3600: suggested_expiry = 60
-                elif max_tf >= 1800: suggested_expiry = 30
-                elif max_tf >= 900: suggested_expiry = 15
-                elif max_tf >= 300: suggested_expiry = 5
-                else: suggested_expiry = 1
+                min_tf_val = min(enabled_tfs) // 60
+                max_tf_val = max(enabled_tfs) // 60
+                ref_htf = max_tf_val
+                if len(enabled_tfs) > 1:
+                    ref_htf = sorted(enabled_tfs)[-1] // 60
+
+                target_h = h_small or h_mid or h_high
+                expiry = self._get_smart_expiry(target_h.get_dataframe(), min_tf_val, ref_htf)
             else:
-                suggested_expiry = 5
+                expiry = 5
 
             if "QUICK" in label:
-                suggested_expiry = max(1, suggested_expiry // 2)
+                expiry = max(1, expiry // 2)
 
             data = {
                 'confidence': round(confidence, 1),
                 'label': label,
-                'signal': 'BUY' if 'BUY' in label else ('SELL' if 'SELL' in label else 'WAIT'),
+                'direction': direction,
+                'signal': signal,
                 'desc': label,
                 'summary_small': rec_small,
                 'summary_mid': rec_mid,
                 'summary_high': rec_high,
-                'expiry_min': suggested_expiry,
-                'atr': 0.0, # Placeholder or calculate if needed
+                'expiry_min': expiry,
+                'atr': 0.0,
                 'last_update': time.time()
             }
             self.bot.screener_data[symbol] = data
-            logging.info(f"Strategy 7 update for {symbol}: {label} (Expiry: {suggested_expiry}m)")
             self.bot.emit('screener_update', {'symbol': symbol, 'data': data})
             return data
         except Exception as e:
@@ -238,6 +299,6 @@ class ScreenerHandler:
                 for symbol in symbols:
                     if self.stop_event.is_set(): break
                     executor.submit(self.update_screener, symbol, config)
-                    time.sleep(1.0) # Throttle symbol processing
+                    time.sleep(1.0)
 
                 time.sleep(10)
