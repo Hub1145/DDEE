@@ -6,7 +6,8 @@ import time
 from datetime import datetime, timezone, timedelta
 from handlers.utils import (
     calculate_supertrend, detect_macd_divergence, check_price_action_patterns,
-    score_reversal_pattern, calculate_snr_zones, calculate_echo_forecast
+    score_reversal_pattern, calculate_snr_zones, calculate_echo_forecast,
+    calculate_structural_rr
 )
 from handlers.ta_handler import get_ta_signal
 
@@ -93,6 +94,16 @@ class StrategyHandler:
         if signal not in ['BUY', 'SELL']:
             return
 
+        # v5.2 Structural Entry Validation (Gatekeeper)
+        # We only enter if Reward/Risk based on Echo path is favorable (> 1.5)
+        fcast_data = data.get('fcast_data')
+        if fcast_data and 'forecast_prices' in fcast_data:
+            rr = calculate_structural_rr(sd.get('last_tick'), fcast_data['forecast_prices'], signal)
+            if rr < 1.5:
+                # If RR is low, it means we are likely at the end of the move or too close to a peak.
+                # We wait for a better entry (pullback).
+                return
+
         # Check if already in position for this symbol
         for cid, c in self.bot.contracts.items():
             if c['symbol'] == symbol:
@@ -149,16 +160,21 @@ class StrategyHandler:
                 elif last_price >= htf_open and current_price < htf_open:
                     is_cross_down = True
 
-        # Echo Forecast Confirmation
+        # Echo Forecast Confirmation & Structural RR Gatekeeper
         echo_confirmed = False
         ltf_df = pd.DataFrame(sd.get('ltf_candles', []))
         if not ltf_df.empty:
             fcast_prices, correlation = calculate_echo_forecast(ltf_df)
             if fcast_prices and correlation > 0.5:
                 fcast_final = fcast_prices[-1]
-                if is_cross_up and fcast_final > current_price:
+
+                # Check RR to ensure we aren't buying at the top or selling at the bottom
+                direction = "BUY" if is_cross_up else "SELL"
+                rr = calculate_structural_rr(current_price, fcast_prices, direction)
+
+                if is_cross_up and fcast_final > current_price and rr >= 1.5:
                     echo_confirmed = True
-                elif is_cross_down and fcast_final < current_price:
+                elif is_cross_down and fcast_final < current_price and rr >= 1.5:
                     echo_confirmed = True
 
         # Signal Filtering
@@ -232,17 +248,21 @@ class StrategyHandler:
                         z['total_lifetime_touches'] = z.get('total_lifetime_touches', 0) + 1
                         break
 
-        # Echo Forecast Confirmation for SNR
+        # Echo Forecast Confirmation & Structural RR for SNR
         if signal:
             ltf_df = pd.DataFrame(sd.get('ltf_candles', []))
             if not ltf_df.empty:
                 fcast_prices, correlation = calculate_echo_forecast(ltf_df)
                 if fcast_prices and correlation > 0.5:
                     fcast_final = fcast_prices[-1]
-                    if signal == 'buy' and fcast_final <= current_price:
-                        signal = None # Echo doesn't confirm reversal UP
-                    elif signal == 'sell' and fcast_final >= current_price:
-                        signal = None # Echo doesn't confirm reversal DOWN
+                    rr = calculate_structural_rr(current_price, fcast_prices, signal)
+
+                    if signal == 'buy':
+                        if fcast_final <= current_price or rr < 1.5:
+                            signal = None # Echo doesn't confirm reversal UP or poor RR
+                    elif signal == 'sell':
+                        if fcast_final >= current_price or rr < 1.5:
+                            signal = None # Echo doesn't confirm reversal DOWN or poor RR
 
         if signal:
             self.bot.log(f"Strategy 4 triggered {signal} for {symbol}")

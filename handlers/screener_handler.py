@@ -168,6 +168,7 @@ class ScreenerHandler:
                 'momentum': momentum,
                 'volatility': volatility,
                 'structure': structure,
+                'fcast_data': fcast_data,
                 'last_update': time.time()
             }
             self.bot.screener_data[symbol] = data
@@ -242,6 +243,7 @@ class ScreenerHandler:
                 'structure': structure,
                 'rsi': round(rsi, 2),
                 'trend_rec': rec15m,
+                'fcast_data': fcast_data,
                 'last_update': time.time()
             }
             self.bot.screener_data[symbol] = data
@@ -360,6 +362,7 @@ class ScreenerHandler:
                 'expiry_min': expiry,
                 'atr': round(atr_val, 4),
                 'trend': trend, 'momentum': momentum, 'volatility': volatility, 'structure': structure,
+                'fcast_data': fcast_data,
                 'last_update': time.time()
             }
             self.bot.screener_data[symbol] = data
@@ -397,6 +400,7 @@ class ScreenerHandler:
                 'threshold': 50,
                 'expiry_min': expiry,
                 'trend_rec': echo_dir,
+                'fcast_data': fcast_data,
                 'last_update': time.time()
             }
             self.bot.screener_data[symbol] = data
@@ -437,6 +441,10 @@ class ScreenerHandler:
             'threshold': 0,
             'expiry_min': htf_sec // 60,
             'trend_rec': ta_signal,
+            'fcast_data': {
+                'forecast_prices': fcast_prices,
+                'correlation': correlation
+            },
             'last_update': time.time()
         }
         self.bot.screener_data[symbol] = data

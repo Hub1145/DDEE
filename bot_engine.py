@@ -1131,12 +1131,13 @@ class TradingBotEngine:
             metrics = self.screener_data.get(c['symbol'], {})
             strat_key = self.config.get('active_strategy')
 
-            # Use Smart TP/SL engine for Strategies 5, 6, 7
-            if strat_key in ['strategy_5', 'strategy_6', 'strategy_7']:
-                atr = metrics.get('atr_1m') or metrics.get('atr') or (entry * 0.001)
-                confidence = metrics.get('confidence', 50)
+            # Use Smart TP/SL engine for ALL strategies if fcast data is available
+            fcast_data = metrics.get('fcast_data')
+            atr = metrics.get('atr_1m') or metrics.get('atr') or (entry * 0.001)
+            confidence = metrics.get('confidence', 50)
 
-                tp_price, sl_price = get_smart_targets(entry, internal_side, atr, confidence, fcast_data=metrics)
+            if strat_key in ['strategy_1', 'strategy_2', 'strategy_3', 'strategy_4', 'strategy_5', 'strategy_6', 'strategy_7']:
+                tp_price, sl_price = get_smart_targets(entry, internal_side, atr, confidence, fcast_data=fcast_data)
 
                 if tp_price: self.contracts[cid]['tp_price'] = tp_price
                 if sl_price: self.contracts[cid]['sl_price'] = sl_price

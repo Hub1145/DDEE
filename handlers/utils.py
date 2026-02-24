@@ -341,6 +341,30 @@ def predict_expiry_v5(symbol, strategy_key, ltf_min, htf_min, confidence, fcast_
 
     return max(1, base_expiry)
 
+def calculate_structural_rr(current_price: float, forecast_prices: list, direction: str):
+    """
+    Calculates the Reward/Risk ratio based on the projected structural path.
+    Reward = Distance to the projected extreme in signal direction.
+    Risk = Distance to the projected opposite extreme (potential pullback/stop).
+    """
+    if not forecast_prices:
+        return 1.0
+
+    forecast_max = max(forecast_prices)
+    forecast_min = min(forecast_prices)
+
+    if direction.upper() in ["BUY", "CALL", "LONG"]:
+        reward = forecast_max - current_price
+        risk = current_price - forecast_min
+    else:
+        reward = current_price - forecast_min
+        risk = forecast_max - current_price
+
+    if risk <= 0:
+        return 10.0 # High RR if no projected risk
+
+    return reward / risk
+
 def get_smart_targets(entry_price, side, atr, confidence, fcast_data=None):
     """
     Expert Intelligence TP/SL Engine (Enhanced with Echo Forecast).
