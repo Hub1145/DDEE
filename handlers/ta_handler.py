@@ -403,7 +403,15 @@ class ConnectionManager:
                 cls._instance.thread = None
                 cls._instance.requests: Dict[str, asyncio.Future] = {}
                 cls._instance.stop_event = asyncio.Event()
+                cls._instance.app_id = "62845"
         return cls._instance
+
+    def set_app_id(self, app_id: str):
+        if self.app_id != app_id:
+            self.app_id = app_id
+            # Reconnection will happen automatically if we close the current WS
+            if self.ws and self.loop:
+                asyncio.run_coroutine_threadsafe(self.ws.close(), self.loop)
 
     def start(self):
         if self.thread and self.thread.is_alive():
@@ -420,9 +428,10 @@ class ConnectionManager:
     async def _maintain_connection(self):
         while not self.stop_event.is_set():
             try:
-                async with websockets.connect(DERIV_WS_URL) as ws:
+                url = f"wss://ws.binaryws.com/websockets/v3?app_id={self.app_id}"
+                async with websockets.connect(url) as ws:
                     self.ws = ws
-                    print("TAHandler: Connected to Deriv WS")
+                    print(f"TAHandler: Connected to Deriv WS (App ID: {self.app_id})")
                     while not self.stop_event.is_set():
                         msg = await ws.recv()
                         data = json.loads(msg)

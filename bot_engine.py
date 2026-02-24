@@ -9,7 +9,7 @@ import websocket
 import pandas as pd
 import numpy as np
 import ta
-from handlers.ta_handler import DerivTA, Interval
+from handlers.ta_handler import DerivTA, Interval, manager
 from handlers.screener_handler import ScreenerHandler
 from handlers.strategy_handler import StrategyHandler
 from handlers.utils import (
@@ -153,7 +153,10 @@ class TradingBotEngine:
     def _load_config(self):
         try:
             with open(self.config_path, 'r') as f:
-                return json.load(f)
+                config = json.load(f)
+                if 'deriv_app_id' in config:
+                    manager.set_app_id(config['deriv_app_id'])
+                return config
         except Exception as e:
             # We can't use self.log yet because it might emit before engine is ready
             logging.error(f"Error loading config: {e}")

@@ -4,6 +4,9 @@ import pandas as pd
 import ta
 from concurrent.futures import ThreadPoolExecutor
 from handlers.ta_handler import DerivTA, Interval
+from handlers.utils import (
+    calculate_snr_zones, check_price_action_patterns, score_reversal_pattern
+)
 
 class ScreenerHandler:
     def __init__(self, bot_engine):
@@ -37,12 +40,88 @@ class ScreenerHandler:
             if not atr_current or not atr_avg:
                 return htf_min
 
-            vol_factor = atr_avg / atr_current
-            suggested = htf_min * vol_factor
-            final_expiry = max(ltf_min, min(htf_min * 3, int(round(suggested))))
-            return final_expiry
+            ratio = atr_avg / atr_current
+
+            if ltf_min == 1:
+                suggested = 3 * ratio
+                return max(1, min(5, int(round(suggested))))
+            elif ltf_min == 5:
+                suggested = 12 * ratio
+                return max(5, min(20, int(round(suggested))))
+            else:
+                mid = (ltf_min + htf_min) / 2
+                suggested = mid * ratio
+                return max(ltf_min, min(htf_min * 3, int(round(suggested))))
         except:
             return htf_min
+
+    def _calculate_scores(self, symbol, analysis, df):
+        """Calculate detailed scores for the UI."""
+        try:
+            # 1. Trend Score
+            ma = analysis.moving_averages
+            t_total = ma['BUY'] + ma['SELL'] + ma['NEUTRAL']
+            trend = round((ma['BUY'] - ma['SELL']) / t_total * 10, 1) if t_total > 0 else 0
+
+            # 2. Momentum Score
+            osc = analysis.oscillators
+            o_total = osc['BUY'] + osc['SELL'] + osc['NEUTRAL']
+            momentum = round((osc['BUY'] - osc['SELL']) / o_total * 10, 1) if o_total > 0 else 0
+
+            # 3. Volatility Score
+            atr_series = ta.volatility.AverageTrueRange(df['high'], df['low'], df['close'], window=14).average_true_range()
+            atr_curr = atr_series.iloc[-1]
+            atr_avg = atr_series.rolling(50).mean().iloc[-1]
+            volatility = round((atr_curr / atr_avg) * 5, 1) if atr_avg else 0
+
+            # 4. Structure Score (Price Action + SNR)
+            sd = self.bot.symbol_data.get(symbol, {})
+            if not sd.get('snr_zones'):
+                sd['snr_zones'] = calculate_snr_zones(symbol, sd)
+
+            zones = sd.get('snr_zones', [])
+            price = df['close'].iloc[-1]
+
+            # Base score on SNR proximity
+            snr_score = 0
+            closest_zone = None
+            if zones:
+                min_dist = 99999
+                for z in zones:
+                    dist = abs(price - z['price']) / price
+                    if dist < min_dist:
+                        min_dist = dist
+                        closest_zone = z
+                snr_score = max(0, (0.005 - min_dist) / 0.005 * 5) # Up to 5 points for SNR proximity
+
+            # Price Action Pattern Detection
+            candles = []
+            for idx, row in df.iterrows():
+                candles.append({
+                    'open': row['open'], 'high': row['high'], 'low': row['low'], 'close': row['close'], 'epoch': row['epoch']
+                })
+
+            pattern = check_price_action_patterns(candles)
+            pa_score = 0
+            if pattern and pattern != "marubozu":
+                base_pa_val = score_reversal_pattern(symbol, pattern, candles)
+                # Boost if pattern matches zone type
+                if closest_zone and min_dist < 0.002:
+                    if pattern.startswith('bullish') and closest_zone['type'] in ['S', 'Flip']:
+                        pa_score = base_pa_val * 2
+                    elif pattern.startswith('bearish') and closest_zone['type'] in ['R', 'Flip']:
+                        pa_score = base_pa_val * 2
+                    else:
+                        pa_score = base_pa_val
+                else:
+                    pa_score = base_pa_val
+
+            structure = round(min(10, snr_score + pa_score), 1)
+
+            return trend, momentum, volatility, structure
+        except Exception as e:
+            logging.error(f"Error calculating scores for {symbol}: {e}")
+            return 0, 0, 0, 0
 
     def analyze_strategy_5(self, symbol):
         """Strategy 5: Triple EMA Alignment (1m, 5m, 1h)"""
@@ -62,36 +141,38 @@ class ScreenerHandler:
             signal = "WAIT"
             direction = "NEUTRAL"
             desc = "No alignment"
-            confidence = 0
 
             if "BUY" in rec1m and "BUY" in rec5m and "BUY" in rec1h:
                 signal = "BUY"
                 direction = "CALL"
                 desc = "Triple EMA Alignment UP"
-                confidence = 100
             elif "SELL" in rec1m and "SELL" in rec5m and "SELL" in rec1h:
                 signal = "SELL"
                 direction = "PUT"
                 desc = "Triple EMA Alignment DOWN"
-                confidence = 100
 
             df1m = h1m.get_dataframe()
-            expiry = self._get_smart_expiry(df1m, 1, 15)
-            atr_1m = ta.volatility.AverageTrueRange(df1m['high'], df1m['low'], df1m['close'], window=14).average_true_range().iloc[-1]
+            expiry = self._get_smart_expiry(df1m, 1, 60)
+
+            trend, momentum, volatility, structure = self._calculate_scores(symbol, a5m, h5m.get_dataframe())
+            confidence = round(abs(a5m.summary['BUY'] - a5m.summary['SELL']) / (a5m.summary['BUY'] + a5m.summary['SELL'] + a5m.summary['NEUTRAL']) * 100, 1)
 
             data = {
                 'signal': signal,
                 'direction': direction,
                 'desc': desc,
                 'confidence': confidence,
+                'threshold': 72,
                 'expiry_min': expiry,
-                'atr_1m': round(atr_1m, 4),
-                'ltf': rec1m,
-                'mtf': rec5m,
-                'htf': rec1h,
+                'atr_1m': round(ta.volatility.AverageTrueRange(df1m['high'], df1m['low'], df1m['close']).average_true_range().iloc[-1], 4),
+                'trend': trend,
+                'momentum': momentum,
+                'volatility': volatility,
+                'structure': structure,
                 'last_update': time.time()
             }
             self.bot.screener_data[symbol] = data
+            logging.info(f"Strategy 5 update for {symbol}: {data['direction']} | {data['signal']} | Expiry: {data['expiry_min']}m")
             self.bot.emit('screener_update', {'symbol': symbol, 'data': data})
             return data
         except Exception as e:
@@ -108,40 +189,45 @@ class ScreenerHandler:
             a15m = h15m.get_analysis()
 
             rsi = a1m.indicators.get('RSI', 50)
-            trend = a15m.summary['RECOMMENDATION']
+            trend_rec = a15m.summary['RECOMMENDATION']
 
             signal = "WAIT"
             direction = "NEUTRAL"
-            desc = f"RSI: {rsi:.1f}, Trend: {trend}"
-            confidence = 0
+            desc = f"RSI: {rsi:.1f}, Trend: {trend_rec}"
 
-            if rsi < 30 and "BUY" in trend:
+            if rsi < 30 and "BUY" in trend_rec:
                 signal = "BUY"
                 direction = "CALL"
                 desc = "RSI Oversold + Bullish Trend"
-                confidence = 100
-            elif rsi > 70 and "SELL" in trend:
+            elif rsi > 70 and "SELL" in trend_rec:
                 signal = "SELL"
                 direction = "PUT"
                 desc = "RSI Overbought + Bearish Trend"
-                confidence = 100
 
             df1m = h1m.get_dataframe()
             expiry = self._get_smart_expiry(df1m, 1, 15)
-            atr_1m = ta.volatility.AverageTrueRange(df1m['high'], df1m['low'], df1m['close'], window=14).average_true_range().iloc[-1]
+
+            trend, momentum, volatility, structure = self._calculate_scores(symbol, a15m, h15m.get_dataframe())
+            confidence = round(abs(a15m.summary['BUY'] - a15m.summary['SELL']) / (a15m.summary['BUY'] + a15m.summary['SELL'] + a15m.summary['NEUTRAL']) * 100, 1)
 
             data = {
                 'signal': signal,
                 'direction': direction,
                 'desc': desc,
                 'confidence': confidence,
+                'threshold': 60,
                 'expiry_min': expiry,
-                'atr_1m': round(atr_1m, 4),
-                'rsi': round(rsi, 2),
+                'atr_1m': round(ta.volatility.AverageTrueRange(df1m['high'], df1m['low'], df1m['close']).average_true_range().iloc[-1], 4),
                 'trend': trend,
+                'momentum': momentum,
+                'volatility': volatility,
+                'structure': structure,
+                'rsi': round(rsi, 2),
+                'trend_rec': trend_rec,
                 'last_update': time.time()
             }
             self.bot.screener_data[symbol] = data
+            logging.info(f"Strategy 6 update for {symbol}: {data['direction']} | {data['signal']} | Expiry: {data['expiry_min']}m")
             self.bot.emit('screener_update', {'symbol': symbol, 'data': data})
             return data
         except Exception as e:
@@ -203,17 +289,18 @@ class ScreenerHandler:
 
             confidence = ((total_buy - total_sell) / total_signals) * 100 if total_signals > 0 else 0
 
-            enabled = []
-            if a_small: enabled.append(a_small)
-            if a_mid: enabled.append(a_mid)
-            if a_high: enabled.append(a_high)
+            enabled_handlers = []
+            if h_small: enabled_handlers.append(h_small)
+            if h_mid: enabled_handlers.append(h_mid)
+            if h_high: enabled_handlers.append(h_high)
 
             label = "NEUTRAL"
             direction = "NEUTRAL"
             signal = "WAIT"
 
-            if len(enabled) == 1:
-                rec = enabled[0].summary['RECOMMENDATION']
+            if len(enabled_handlers) == 1:
+                h = enabled_handlers[0]
+                rec = h.get_analysis().summary['RECOMMENDATION']
                 if rec == "BUY":
                     label = "ALIGNED_BUY"
                     direction = "CALL"
@@ -222,9 +309,10 @@ class ScreenerHandler:
                     label = "ALIGNED_SELL"
                     direction = "PUT"
                     signal = "SELL"
-            elif len(enabled) > 1:
-                all_buy = all("BUY" in a.summary['RECOMMENDATION'] for a in enabled)
-                all_sell = all("SELL" in a.summary['RECOMMENDATION'] for a in enabled)
+            elif len(enabled_handlers) > 1:
+                enabled_analyses = [h.get_analysis() for h in enabled_handlers]
+                all_buy = all("BUY" in a.summary['RECOMMENDATION'] for a in enabled_analyses)
+                all_sell = all("SELL" in a.summary['RECOMMENDATION'] for a in enabled_analyses)
 
                 quick_buy = False
                 quick_sell = False
@@ -249,20 +337,21 @@ class ScreenerHandler:
                     direction = "PUT"
                     signal = "SELL"
 
-            enabled_tfs = []
-            if tf_small: enabled_tfs.append(tf_small.value)
-            if tf_mid: enabled_tfs.append(tf_mid.value)
-            if tf_high: enabled_tfs.append(tf_high.value)
-
-            if enabled_tfs:
-                min_tf_val = min(enabled_tfs) // 60
-                max_tf_val = max(enabled_tfs) // 60
+            mid_atr_val = 0.0
+            trend = momentum = volatility = structure = 0
+            if enabled_handlers:
+                min_tf_val = min(h.interval.value for h in enabled_handlers) // 60
+                max_tf_val = max(h.interval.value for h in enabled_handlers) // 60
                 ref_htf = max_tf_val
-                if len(enabled_tfs) > 1:
-                    ref_htf = sorted(enabled_tfs)[-1] // 60
 
-                target_h = h_small or h_mid or h_high
+                target_h = enabled_handlers[0]
                 expiry = self._get_smart_expiry(target_h.get_dataframe(), min_tf_val, ref_htf)
+
+                h_ref = h_mid or target_h
+                df_ref = h_ref.get_dataframe()
+                mid_atr_val = round(ta.volatility.AverageTrueRange(df_ref['high'], df_ref['low'], df_ref['close']).average_true_range().iloc[-1], 4)
+
+                trend, momentum, volatility, structure = self._calculate_scores(symbol, enabled_handlers[-1].get_analysis(), enabled_handlers[-1].get_dataframe())
             else:
                 expiry = 5
 
@@ -279,10 +368,15 @@ class ScreenerHandler:
                 'summary_mid': rec_mid,
                 'summary_high': rec_high,
                 'expiry_min': expiry,
-                'atr': 0.0,
+                'atr': mid_atr_val,
+                'trend': trend,
+                'momentum': momentum,
+                'volatility': volatility,
+                'structure': structure,
                 'last_update': time.time()
             }
             self.bot.screener_data[symbol] = data
+            logging.info(f"Strategy 7 update for {symbol}: {data['direction']} | {data['signal']} | Expiry: {data['expiry_min']}m")
             self.bot.emit('screener_update', {'symbol': symbol, 'data': data})
             return data
         except Exception as e:

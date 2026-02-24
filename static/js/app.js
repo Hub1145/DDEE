@@ -250,7 +250,7 @@ function updateScreenerTable(symbol, data) {
     const isHighOff = activeStrategy === 'strategy_7' && currentConfig && currentConfig.strat7_high_tf === 'OFF';
 
     if (activeStrategy === 'strategy_7') {
-        if (recHeader) recHeader.textContent = "ATR (Mid TF)";
+        if (recHeader) recHeader.textContent = "Expiry | ATR";
         if (dynamicCols.length >= 4) {
             const tfMap = { "60": "1m", "120": "2m", "180": "3m", "300": "5m", "900": "15m", "1800": "30m", "3600": "1h", "7200": "2h", "14400": "4h", "86400": "1d" };
 
@@ -267,7 +267,7 @@ function updateScreenerTable(symbol, data) {
             dynamicCols[3].style.display = '';
         }
     } else {
-        if (recHeader) recHeader.textContent = "Recommendation";
+        if (recHeader) recHeader.textContent = "Expiry | ATR";
         if (dynamicCols.length >= 4) {
             dynamicCols.forEach(col => col.style.display = '');
             dynamicCols[0].textContent = "Trend";
@@ -292,8 +292,9 @@ function updateScreenerTable(symbol, data) {
         let col3 = d.volatility || 0;
         let col4 = d.structure || 0;
 
+        const sessionTag = d.is_dead_hours ? ' <span class="text-warning" title="Session Filter Active (22-06 UTC)">🌙</span>' : '';
         if (activeStrategy === 'strategy_7') {
-            recValue = `${d.expiry_min}m | ATR:${d.atr || "0.00"}`;
+            recValue = `${d.expiry_min}m${sessionTag} | ${d.atr || "0.00"}`;
             col1 = `<span class="badge ${d.summary_small?.includes('BUY') ? 'bg-success' : (d.summary_small?.includes('SELL') ? 'bg-danger' : 'bg-secondary')}">${d.summary_small || 'NEUTRAL'}</span>`;
             col2 = `<span class="badge ${d.summary_mid?.includes('BUY') ? 'bg-success' : (d.summary_mid?.includes('SELL') ? 'bg-danger' : 'bg-secondary')}">${d.summary_mid || 'NEUTRAL'}</span>`;
             col3 = `<span class="badge ${d.summary_high?.includes('BUY') ? 'bg-success' : (d.summary_high?.includes('SELL') ? 'bg-danger' : 'bg-secondary')}">${d.summary_high || 'NEUTRAL'}</span>`;
@@ -301,11 +302,10 @@ function updateScreenerTable(symbol, data) {
             const aligned = (d.summary_small === d.summary_mid && d.summary_mid === d.summary_high && d.summary_mid !== 'NEUTRAL');
             col4 = aligned ? '<span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Aligned</span>' : '<span class="text-muted">Mixed</span>';
         } else {
-            const sessionTag = d.is_dead_hours ? ' <span class="text-warning" title="Session Filter Active (22-06 UTC)">🌙</span>' : '';
             if (contractType === 'multiplier') {
-                recValue = `x${d.multiplier}${sessionTag} | ATR:${d.atr}`;
+                recValue = `x${d.multiplier}${sessionTag} | ${d.atr}`;
             } else {
-                recValue = `${d.expiry_min}m${sessionTag} | 1mATR:${d.atr_1m}`;
+                recValue = `${d.expiry_min}m${sessionTag} | ${d.atr_1m || d.atr || "0.00"}`;
             }
         }
 
