@@ -1,26 +1,92 @@
-2026-02-24 11:21:32,678 - INFO - Bot started | Trading: OFF
-2026-02-24 11:21:32,683 - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
-2026-02-24 11:21:32,692 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+2026-02-24 12:03:38,447 - INFO - Bot started | Trading: OFF
+2026-02-24 12:03:38,448 - INFO - Screener background loop started
+2026-02-24 12:03:38,451 - INFO - History worker started
+2026-02-24 12:03:38,451 - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+2026-02-24 12:03:38,457 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
  * Running on all addresses (0.0.0.0)
  * Running on http://127.0.0.1:3000
  * Running on http://192.168.0.2:3000
-2026-02-24 11:21:32,693 - INFO - [33mPress CTRL+C to quit[0m
-2026-02-24 11:21:32,904 - INFO - Websocket connected
-2026-02-24 11:21:32,904 - INFO - Deriv WebSocket connected.
-2026-02-24 11:21:33,139 - INFO - Authorization successful.
-2026-02-24 11:21:33,140 - INFO - Daily starting balance set: 316.6
-2026-02-24 11:21:36,267 - INFO - 127.0.0.1 - - [24/Feb/2026 11:21:36] "GET /api/config HTTP/1.1" 200 -
-2026-02-24 11:21:36,273 - INFO - Config applied live
-2026-02-24 11:21:36,274 - INFO - Configuration updated live from dashboard.
-2026-02-24 11:21:36,274 - INFO - Bot started | Trading: OFF
-2026-02-24 11:21:36,275 - INFO - 127.0.0.1 - - [24/Feb/2026 11:21:36] "POST /api/config HTTP/1.1" 200 -
-2026-02-24 11:21:39,373 - INFO - 127.0.0.1 - - [24/Feb/2026 11:21:39] "GET / HTTP/1.1" 200 -
-2026-02-24 11:21:39,396 - INFO - 127.0.0.1 - - [24/Feb/2026 11:21:39] "GET /static/js/app.js HTTP/1.1" 200 -
-2026-02-24 11:21:39,519 - INFO - 127.0.0.1 - - [24/Feb/2026 11:21:39] "GET /socket.io/?EIO=4&transport=polling&t=PoFOYEw HTTP/1.1" 200 -
-2026-02-24 11:21:39,524 - INFO - 127.0.0.1 - - [24/Feb/2026 11:21:39] "GET /api/config HTTP/1.1" 200 -
-2026-02-24 11:21:39,534 - INFO - 127.0.0.1 - - [24/Feb/2026 11:21:39] "GET /socket.io/?EIO=4&transport=polling&t=PoFOYF7&sid=4dGOEWDgLyj9KamkAAAA HTTP/1.1" 200 -
-2026-02-24 11:21:39,537 - INFO - Client connected: aOO1EUvw29_J5t0xAAAB
-2026-02-24 11:21:39,538 - INFO - 127.0.0.1 - - [24/Feb/2026 11:21:39] "POST /socket.io/?EIO=4&transport=polling&t=PoFOYF5&sid=4dGOEWDgLyj9KamkAAAA HTTP/1.1" 200 -
-2026-02-24 11:21:43,771 - INFO - Client disconnected
-2026-02-24 11:21:43,772 - INFO - 127.0.0.1 - - [24/Feb/2026 11:21:43] "GET /socket.io/?EIO=4&transport=websocket&sid=4dGOEWDgLyj9KamkAAAA HTTP/1.1" 200 -
-2026-02-24 11:21:48,138 - ERROR - Strategy 7 update error for R_100: Deriv API error: Sorry, an error occurred while processing your request.
+2026-02-24 12:03:38,457 - INFO - [33mPress CTRL+C to quit[0m
+2026-02-24 12:03:38,659 - INFO - Websocket connected
+2026-02-24 12:03:38,660 - INFO - Deriv WebSocket connected.
+2026-02-24 12:03:38,913 - INFO - Authorization successful.
+2026-02-24 12:03:38,914 - INFO - Daily starting balance set: 306.6
+2026-02-24 12:03:38,961 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:03:42,386 - INFO - 127.0.0.1 - - [24/Feb/2026 12:03:42] "GET / HTTP/1.1" 200 -
+2026-02-24 12:03:42,416 - INFO - 127.0.0.1 - - [24/Feb/2026 12:03:42] "GET /static/js/app.js HTTP/1.1" 200 -
+2026-02-24 12:03:42,589 - INFO - 127.0.0.1 - - [24/Feb/2026 12:03:42] "GET /socket.io/?EIO=4&transport=polling&t=PoFYADr HTTP/1.1" 200 -
+2026-02-24 12:03:42,602 - INFO - 127.0.0.1 - - [24/Feb/2026 12:03:42] "GET /api/config HTTP/1.1" 200 -
+2026-02-24 12:03:42,607 - INFO - Client connected: hnV-oDyV2GhKfUERAAAB
+2026-02-24 12:03:42,609 - INFO - 127.0.0.1 - - [24/Feb/2026 12:03:42] "POST /socket.io/?EIO=4&transport=polling&t=PoFYAE7&sid=BT4hFEKC0ki-QJtFAAAA HTTP/1.1" 200 -
+2026-02-24 12:03:42,613 - INFO - 127.0.0.1 - - [24/Feb/2026 12:03:42] "GET /socket.io/?EIO=4&transport=polling&t=PoFYAEB&sid=BT4hFEKC0ki-QJtFAAAA HTTP/1.1" 200 -
+2026-02-24 12:03:42,632 - INFO - 127.0.0.1 - - [24/Feb/2026 12:03:42] "GET /socket.io/?EIO=4&transport=polling&t=PoFYAES&sid=BT4hFEKC0ki-QJtFAAAA HTTP/1.1" 200 -
+2026-02-24 12:03:49,513 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:04:00,505 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:04:11,511 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:04:12,709 - INFO - Client disconnected
+2026-02-24 12:04:12,709 - INFO - 127.0.0.1 - - [24/Feb/2026 12:04:12] "GET /socket.io/?EIO=4&transport=websocket&sid=BT4hFEKC0ki-QJtFAAAA HTTP/1.1" 200 -
+2026-02-24 12:04:22,538 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:04:31,992 - INFO - Bot started | Trading: OFF
+2026-02-24 12:04:31,993 - INFO - Screener background loop started
+2026-02-24 12:04:31,997 - INFO - History worker started
+2026-02-24 12:04:31,998 - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+2026-02-24 12:04:32,005 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.0.2:3000
+2026-02-24 12:04:32,005 - INFO - [33mPress CTRL+C to quit[0m
+2026-02-24 12:04:32,296 - INFO - Websocket connected
+2026-02-24 12:04:32,296 - INFO - Deriv WebSocket connected.
+2026-02-24 12:04:32,579 - INFO - Authorization successful.
+2026-02-24 12:04:32,580 - INFO - Daily starting balance set: 306.6
+2026-02-24 12:04:32,714 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:04:35,725 - INFO - 127.0.0.1 - - [24/Feb/2026 12:04:35] "GET / HTTP/1.1" 200 -
+2026-02-24 12:04:35,747 - INFO - 127.0.0.1 - - [24/Feb/2026 12:04:35] "GET /static/js/app.js HTTP/1.1" 200 -
+2026-02-24 12:04:35,879 - INFO - 127.0.0.1 - - [24/Feb/2026 12:04:35] "GET /socket.io/?EIO=4&transport=polling&t=PoFYNEY HTTP/1.1" 200 -
+2026-02-24 12:04:35,885 - INFO - 127.0.0.1 - - [24/Feb/2026 12:04:35] "GET /api/config HTTP/1.1" 200 -
+2026-02-24 12:04:35,893 - INFO - Client connected: pkOTA8IR6Mzh2invAAAB
+2026-02-24 12:04:35,894 - INFO - 127.0.0.1 - - [24/Feb/2026 12:04:35] "POST /socket.io/?EIO=4&transport=polling&t=PoFYNEj&sid=gmNh-SwHkMR933meAAAA HTTP/1.1" 200 -
+2026-02-24 12:04:35,899 - INFO - 127.0.0.1 - - [24/Feb/2026 12:04:35] "GET /socket.io/?EIO=4&transport=polling&t=PoFYNEm&sid=gmNh-SwHkMR933meAAAA HTTP/1.1" 200 -
+2026-02-24 12:04:35,905 - INFO - 127.0.0.1 - - [24/Feb/2026 12:04:35] "GET /socket.io/?EIO=4&transport=polling&t=PoFYNE-&sid=gmNh-SwHkMR933meAAAA HTTP/1.1" 200 -
+2026-02-24 12:04:39,367 - INFO - Client disconnected
+2026-02-24 12:04:39,367 - INFO - 127.0.0.1 - - [24/Feb/2026 12:04:39] "GET /socket.io/?EIO=4&transport=websocket&sid=gmNh-SwHkMR933meAAAA HTTP/1.1" 200 -
+2026-02-24 12:04:43,094 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:04:54,060 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:05:04,910 - INFO - Bot started | Trading: OFF
+2026-02-24 12:05:04,911 - INFO - Screener background loop started
+2026-02-24 12:05:04,914 - INFO - History worker started
+2026-02-24 12:05:04,914 - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+2026-02-24 12:05:04,921 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.0.2:3000
+2026-02-24 12:05:04,921 - INFO - [33mPress CTRL+C to quit[0m
+2026-02-24 12:05:05,122 - INFO - Websocket connected
+2026-02-24 12:05:05,123 - INFO - Deriv WebSocket connected.
+2026-02-24 12:05:05,392 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:05:08,902 - INFO - 127.0.0.1 - - [24/Feb/2026 12:05:08] "GET / HTTP/1.1" 200 -
+2026-02-24 12:05:08,920 - INFO - 127.0.0.1 - - [24/Feb/2026 12:05:08] "GET /static/js/app.js HTTP/1.1" 200 -
+2026-02-24 12:05:09,051 - INFO - 127.0.0.1 - - [24/Feb/2026 12:05:09] "GET /socket.io/?EIO=4&transport=polling&t=PoFYVKs HTTP/1.1" 200 -
+2026-02-24 12:05:09,062 - INFO - 127.0.0.1 - - [24/Feb/2026 12:05:09] "GET /api/config HTTP/1.1" 200 -
+2026-02-24 12:05:09,067 - INFO - Client connected: j_ep7d0nU3AQbynWAAAB
+2026-02-24 12:05:09,068 - INFO - 127.0.0.1 - - [24/Feb/2026 12:05:09] "POST /socket.io/?EIO=4&transport=polling&t=PoFYVL7&sid=SJVYMg8DIYGGYZtCAAAA HTTP/1.1" 200 -
+2026-02-24 12:05:09,079 - INFO - 127.0.0.1 - - [24/Feb/2026 12:05:09] "GET /socket.io/?EIO=4&transport=polling&t=PoFYVL9&sid=SJVYMg8DIYGGYZtCAAAA HTTP/1.1" 200 -
+2026-02-24 12:05:10,356 - INFO - Client disconnected
+2026-02-24 12:05:10,356 - INFO - 127.0.0.1 - - [24/Feb/2026 12:05:10] "GET /socket.io/?EIO=4&transport=websocket&sid=SJVYMg8DIYGGYZtCAAAA HTTP/1.1" 200 -
+2026-02-24 12:05:16,079 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:05:27,028 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:05:37,971 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:05:39,170 - ERROR - Deriv Error: Sorry, an error occurred while processing your request.
+2026-02-24 12:05:48,973 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:05:59,974 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:06:10,988 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:06:21,990 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:06:32,981 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:06:43,981 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:06:55,010 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:07:05,976 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:07:16,985 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:07:27,978 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:07:39,190 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:07:49,979 - INFO - Strategy 7 update for R_100: ALIGNED_BUY
+2026-02-24 12:08:00,980 - INFO - Strategy 7 update for R_100: ALIGNED_BUY

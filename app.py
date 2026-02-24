@@ -79,10 +79,12 @@ def update_config():
         
         if updates_made:
             save_config(current_config)
+            logging.info(f"Config updates made. updates_made=True. bot_engine is {'NOT ' if not bot_engine else ''}None")
 
             warning_msg = None
             if bot_engine:
                 # Update the bot's internal config object and trigger dynamic updates
+                logging.info("Calling bot_engine.apply_live_config_update")
                 result = bot_engine.apply_live_config_update(current_config)
                 if result.get('warnings'):
                     warning_msg = " | ".join(result['warnings'])

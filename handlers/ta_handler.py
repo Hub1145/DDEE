@@ -2,11 +2,12 @@
 import asyncio
 import json
 import time
+import threading
 import numpy as np
 import pandas as pd
 import websockets
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, Dict
 from enum import Enum
 
 
@@ -14,7 +15,7 @@ from enum import Enum
 #  CONSTANTS
 # ─────────────────────────────────────────────
 
-DERIV_WS_URL = "wss://ws.binaryws.com/websockets/v3?app_id=1089"
+DERIV_WS_URL = "wss://ws.binaryws.com/websockets/v3?app_id=62845"
 
 # All available Deriv synthetic volatility symbols
 class Symbol:
@@ -386,6 +387,71 @@ def _compute_analysis(df: pd.DataFrame, symbol: str, interval_name: str) -> Anal
 
 
 # ─────────────────────────────────────────────
+#  PERSISTENT DERIV CONNECTION MANAGER
+# ─────────────────────────────────────────────
+
+class ConnectionManager:
+    _instance = None
+    _lock = threading.Lock()
+
+    def __new__(cls):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super(ConnectionManager, cls).__new__(cls)
+                cls._instance.ws = None
+                cls._instance.loop = None
+                cls._instance.thread = None
+                cls._instance.requests: Dict[str, asyncio.Future] = {}
+                cls._instance.stop_event = asyncio.Event()
+        return cls._instance
+
+    def start(self):
+        if self.thread and self.thread.is_alive():
+            return
+        self.thread = threading.Thread(target=self._run_loop, daemon=True)
+        self.thread.start()
+        time.sleep(1) # Give it a moment to start
+
+    def _run_loop(self):
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_until_complete(self._maintain_connection())
+
+    async def _maintain_connection(self):
+        while not self.stop_event.is_set():
+            try:
+                async with websockets.connect(DERIV_WS_URL) as ws:
+                    self.ws = ws
+                    print("TAHandler: Connected to Deriv WS")
+                    while not self.stop_event.is_set():
+                        msg = await ws.recv()
+                        data = json.loads(msg)
+                        # Deriv echoes back 'passthrough' in 'echo_req'
+                        req_id = data.get('echo_req', {}).get('passthrough', {}).get('req_id')
+                        if req_id and req_id in self.requests:
+                            self.requests[req_id].set_result(data)
+            except Exception as e:
+                print(f"TAHandler: Connection error: {e}")
+                await asyncio.sleep(5)
+
+    async def call(self, request: dict):
+        req_id = str(time.time_ns())
+        request['passthrough'] = {'req_id': req_id}
+        future = self.loop.create_future()
+        self.requests[req_id] = future
+
+        try:
+            await self.ws.send(json.dumps(request))
+            response = await asyncio.wait_for(future, timeout=15)
+            return response
+        finally:
+            del self.requests[req_id]
+
+# Singleton instance
+manager = ConnectionManager()
+manager.start()
+
+# ─────────────────────────────────────────────
 #  DERIV DATA FETCHER
 # ─────────────────────────────────────────────
 
@@ -397,29 +463,18 @@ async def _fetch_candles(symbol: str, granularity: int, count: int = 300) -> pd.
     now = time.time()
     if cache_key in _CANDLE_CACHE:
         ts, cached_df = _CANDLE_CACHE[cache_key]
-        if now - ts < granularity: # Use cache if still in same candle period
+        if now - ts < max(10, granularity // 2): # Use cache if still in same candle period
             return cached_df
-
-    end_time   = int(time.time())
-    start_time = end_time - granularity * count
 
     request = {
         "ticks_history": symbol,
         "style":         "candles",
         "granularity":   granularity,
-        "start":         start_time,
-        "end":           end_time,
+        "end":           "latest",
         "count":         count,
     }
 
-    try:
-        async with websockets.connect(DERIV_WS_URL) as ws:
-            await ws.send(json.dumps(request))
-            response = json.loads(await ws.recv())
-    except Exception as e:
-        if cache_key in _CANDLE_CACHE:
-            return _CANDLE_CACHE[cache_key][1]
-        raise ValueError(f"Deriv Connection error: {e}")
+    response = await manager.call(request)
 
     if "error" in response:
         if cache_key in _CANDLE_CACHE:
@@ -472,9 +527,10 @@ class DerivTA:
 
     def get_analysis(self) -> Analysis:
         """Fetch data and return a full Analysis object."""
-        self._df = asyncio.run(
-            _fetch_candles(self.symbol, self.interval.value, self.candle_count)
-        )
+        self._df = asyncio.run_coroutine_threadsafe(
+            _fetch_candles(self.symbol, self.interval.value, self.candle_count),
+            manager.loop
+        ).result()
         return _compute_analysis(self._df, self.symbol, self.interval.name)
 
     def get_dataframe(self) -> pd.DataFrame:

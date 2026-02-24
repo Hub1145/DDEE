@@ -88,6 +88,9 @@ class TradingBotEngine:
         self.strategy_handler = StrategyHandler(self)
         self.screener_thread = None
         self.tick_executor = ThreadPoolExecutor(max_workers=10)
+        self.history_queue = deque()
+        self.history_lock = threading.Lock()
+        self.last_fetches = {} # (symbol, granularity) -> last_fetch_epoch
         self.strat7_cache = {} # Symbol -> { 'small': Analysis, 'mid': Analysis, 'high': Analysis, 'timestamp': float }
 
         # Account metrics
@@ -260,6 +263,7 @@ class TradingBotEngine:
             symbol = echo.get('ticks_history')
             granularity = echo.get('granularity')
             candles = data.get('candles', [])
+            self.log(f"Received {len(candles)} candles for {symbol} (G:{granularity})")
             self._handle_candles(symbol, granularity, candles)
 
         elif msg_type == 'tick':
@@ -349,15 +353,49 @@ class TradingBotEngine:
             }
 
     def _fetch_history(self, ws, symbol, granularity, count):
-        request = {
-            "ticks_history": symbol,
-            "adjust_start_time": 1,
-            "count": count,
-            "end": "latest",
-            "granularity": granularity,
-            "style": "candles"
-        }
-        ws.send(json.dumps(request))
+        with self.history_lock:
+            # Avoid redundant requests in same minute (or for small granularities, same period)
+            now_epoch = int(time.time() // max(60, granularity))
+            cache_key = (symbol, granularity)
+            if self.last_fetches.get(cache_key) == now_epoch:
+                return
+
+            request = {
+                "ticks_history": symbol,
+                "adjust_start_time": 1,
+                "count": count,
+                "end": "latest",
+                "granularity": granularity,
+                "style": "candles"
+            }
+            self.history_queue.append(request)
+            self.last_fetches[cache_key] = now_epoch
+
+    def _history_worker(self):
+        self.log("History worker started")
+        while not self.stop_event.is_set():
+            is_conn = False
+            if self.ws:
+                try:
+                    # WebSocketApp keeps its own state
+                    is_conn = self.ws.sock and self.ws.sock.connected
+                except:
+                    is_conn = False
+
+            if is_conn and self.history_queue:
+                try:
+                    req = self.history_queue.popleft()
+                    self.log(f"History worker sending: {req.get('ticks_history')} G:{req.get('granularity')}")
+                    self.ws.send(json.dumps(req))
+                    time.sleep(1.0) # More conservative throttle
+                except Exception as e:
+                    self.log(f"History worker error: {e}", "error")
+            else:
+                if not is_conn and self.history_queue:
+                     # Log occasionally that we are waiting for connection
+                     if int(time.time()) % 30 == 0:
+                         self.log("History worker waiting for connection...")
+                time.sleep(0.5)
 
     def _handle_candles(self, symbol, granularity, candles):
         strat_key = self.config.get('active_strategy', 'strategy_1')
@@ -491,36 +529,7 @@ class TradingBotEngine:
             self._monitor_open_contracts(symbol, price)
 
             if self.is_running:
-                # Refresh all timeframes for Strategy 5 periodically
-                if strat_key == 'strategy_5':
-                    now_epoch = tick.get('epoch')
-                    # Refresh every 1m for confirmation
-                    if now_epoch % 60 == 0: self._fetch_history(self.ws, symbol, 60, 2)
-                    # Refresh every 5m for confirmation
-                    if now_epoch % 300 == 0: self._fetch_history(self.ws, symbol, 300, 2)
-                    # Refresh every 15m for mid-term
-                    if now_epoch % 900 == 0: self._fetch_history(self.ws, symbol, 900, 2)
-                    # Refresh every 1h for htf
-                    if now_epoch % 3600 == 0: self._fetch_history(self.ws, symbol, 3600, 2)
-                    # Refresh every 4h for bias
-                    if now_epoch % 14400 == 0: self._fetch_history(self.ws, symbol, 14400, 2)
-
-                # HTF/Bias Refresh for Strategy 5
-                if strat_key == 'strategy_5':
-                    bias_gran = strat['bias_granularity']
-                    if sd['current_bias_candle'] is None or tick.get('epoch') >= sd['current_bias_candle']['epoch'] + bias_gran:
-                        self._fetch_history(self.ws, symbol, bias_gran, 200)
-
-                # HTF Refresh for Strategy 2, 3, 4, 5
-                if strat_key in ['strategy_2', 'strategy_3', 'strategy_4', 'strategy_5']:
-                    htf_gran = strat['htf_granularity']
-                    if sd['htf_epoch'] is None or tick.get('epoch') >= sd['htf_epoch'] + htf_gran:
-                        last_fetch = sd.get('last_htf_fetch_time', 0)
-                        if time.time() - last_fetch > 60: # Throttle to once per minute
-                            sd['last_htf_fetch_time'] = time.time()
-                            # Fetch more for Strategy 4/5 to recalculate zones/indicators
-                            count = 200 if strat_key in ['strategy_4', 'strategy_5'] else 2
-                            self._fetch_history(self.ws, symbol, htf_gran, count)
+                # Periodic fetches removed - Handlers now use DerivTA with centralized caching and persistent WS
 
                 # HTF Candle Management (Internal tracking for closure triggers)
                 if sd['current_htf_candle']:
@@ -1232,6 +1241,7 @@ class TradingBotEngine:
             self.stop_event.clear()
             self.ws_thread = threading.Thread(target=self._run_ws, daemon=True)
             self.ws_thread.start()
+            threading.Thread(target=self._history_worker, daemon=True).start()
         elif self.is_running and self.ws and self.ws.sock and self.ws.sock.connected:
             # Already connected but just started trading, trigger subscriptions
             self.log("Already connected, triggering trading subscriptions...")
@@ -1266,7 +1276,8 @@ class TradingBotEngine:
                     on_error=lambda ws, err: self.log(f"WS Error: {err}", 'error'),
                     on_close=lambda ws, code, msg: self.log("WS Connection Closed")
                 )
-                self.ws.run_forever()
+                # Use ping_interval to keep connection alive
+                self.ws.run_forever(ping_interval=30, ping_timeout=10)
             except Exception as e:
                 self.log(f"WS Exception: {e}", 'error')
             if not self.stop_event.is_set():
