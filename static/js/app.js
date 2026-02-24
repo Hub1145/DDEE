@@ -109,6 +109,7 @@ function setupEventListeners() {
             document.getElementById('configUseFixedBalance').checked = currentConfig.use_fixed_balance !== false;
             document.getElementById('configBalanceValue').value = currentConfig.balance_value || 10;
             document.getElementById('configMaxDailyLoss').value = currentConfig.max_daily_loss_pct || 5;
+            document.getElementById('configMaxDailyProfit').value = currentConfig.max_daily_profit_pct || 10;
             document.getElementById('configTpEnabled').checked = currentConfig.tp_enabled || false;
             document.getElementById('configTpValue').value = currentConfig.tp_value || 0;
             document.getElementById('configSlEnabled').checked = currentConfig.sl_enabled || false;
@@ -286,7 +287,7 @@ function updateScreenerTable(symbol, data) {
         let col4 = d.structure || 0;
 
         if (activeStrategy === 'strategy_7') {
-            recValue = d.atr || "0.00";
+            recValue = `${d.expiry_min}m | ATR:${d.atr || "0.00"}`;
             col1 = `<span class="badge ${d.summary_small?.includes('BUY') ? 'bg-success' : (d.summary_small?.includes('SELL') ? 'bg-danger' : 'bg-secondary')}">${d.summary_small || 'NEUTRAL'}</span>`;
             col2 = `<span class="badge ${d.summary_mid?.includes('BUY') ? 'bg-success' : (d.summary_mid?.includes('SELL') ? 'bg-danger' : 'bg-secondary')}">${d.summary_mid || 'NEUTRAL'}</span>`;
             col3 = `<span class="badge ${d.summary_high?.includes('BUY') ? 'bg-success' : (d.summary_high?.includes('SELL') ? 'bg-danger' : 'bg-secondary')}">${d.summary_high || 'NEUTRAL'}</span>`;
@@ -415,6 +416,7 @@ async function saveConfig() {
         use_fixed_balance: document.getElementById('configUseFixedBalance').checked,
         balance_value: parseFloat(document.getElementById('configBalanceValue').value),
         max_daily_loss_pct: parseFloat(document.getElementById('configMaxDailyLoss').value),
+        max_daily_profit_pct: parseFloat(document.getElementById('configMaxDailyProfit').value),
         tp_enabled: document.getElementById('configTpEnabled').checked,
         tp_value: parseFloat(document.getElementById('configTpValue').value),
         sl_enabled: document.getElementById('configSlEnabled').checked,
