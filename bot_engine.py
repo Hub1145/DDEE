@@ -67,7 +67,7 @@ class TradingBotEngine:
             'name': 'Intelligent Multi-TF Alignment',
             'expiry_type': 'dynamic',
             'ltf_granularity': 60, # Default trigger on 1m
-            'htf_granularity': 3600 # Placeholder to prevent KeyErrors
+            'htf_granularity': 3600
         }
     }
 
@@ -1421,7 +1421,13 @@ class TradingBotEngine:
     def fetch_account_data_sync(self):
         self._emit_updates()
 
-    def batch_modify_tpsl(self): pass
+    def batch_modify_tpsl(self):
+        """Live updates TP/SL for all open contracts based on new config."""
+        self.log("Batch modifying TP/SL for open contracts...")
+        with self.data_lock:
+            for cid in self.contracts:
+                self._calculate_target_prices(cid)
+        self.log("Batch TP/SL modification complete.")
 
     def batch_cancel_orders(self):
         self.log("Cancelling all open trades...")

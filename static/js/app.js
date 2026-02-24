@@ -25,16 +25,21 @@ function updateConfigLabels(strategyOverride = null) {
         const strategy7Options = document.getElementById('strategy7Options');
         const screenerTabNavItem = document.getElementById('screenerTabNavItem');
 
-        // Hide screener tab by default
-        if (screenerTabNavItem) screenerTabNavItem.style.display = 'none';
+        // Screener tab is always available for monitoring
+        if (screenerTabNavItem) screenerTabNavItem.style.display = 'block';
 
         if (strategy === 'strategy_1') {
-            label.textContent = "Wait for 1h Candle Close";
+            label.textContent = "Wait for 15m Candle Close";
             customExpiryContainer.style.display = 'none';
             strategy5Options.style.display = 'none';
             strategy7Options.style.display = 'none';
         } else if (strategy === 'strategy_2') {
             label.textContent = "Wait for 3m Candle Close";
+            customExpiryContainer.style.display = 'block';
+            strategy5Options.style.display = 'none';
+            strategy7Options.style.display = 'none';
+        } else if (strategy === 'strategy_3') {
+            label.textContent = "Wait for 1m Candle Close";
             customExpiryContainer.style.display = 'block';
             strategy5Options.style.display = 'none';
             strategy7Options.style.display = 'none';
@@ -48,15 +53,12 @@ function updateConfigLabels(strategyOverride = null) {
             customExpiryContainer.style.display = 'none';
             strategy5Options.style.display = 'block';
             strategy7Options.style.display = 'none';
-            document.getElementById('screenerTabNavItem').style.display = 'block';
         } else if (strategy === 'strategy_7') {
             label.textContent = "Wait for LTF Confirm";
             customExpiryContainer.style.display = 'none';
-            strategy5Options.style.display = 'block'; // Also has Multiplier/RiseFall
+            strategy5Options.style.display = 'block';
             strategy7Options.style.display = 'block';
-            document.getElementById('screenerTabNavItem').style.display = 'block';
         } else {
-            document.getElementById('screenerTabNavItem').style.display = 'none';
             label.textContent = "Wait for 1m Candle Close";
             customExpiryContainer.style.display = 'block';
             strategy5Options.style.display = 'none';
@@ -246,9 +248,10 @@ function updateScreenerTable(symbol, data) {
     const dynamicCols = document.querySelectorAll('.screener-dynamic-col');
     const recHeader = document.getElementById('screenerRecHeader');
 
+    const isStrat123 = ['strategy_1', 'strategy_2', 'strategy_3'].includes(activeStrategy);
     const isSmallOff = activeStrategy === 'strategy_7' && currentConfig && currentConfig.strat7_small_tf === 'OFF';
-    const isMidOff = activeStrategy === 'strategy_7' && currentConfig && currentConfig.strat7_mid_tf === 'OFF';
-    const isHighOff = activeStrategy === 'strategy_7' && currentConfig && currentConfig.strat7_high_tf === 'OFF';
+    const isMidOff = (activeStrategy === 'strategy_7' && currentConfig && currentConfig.strat7_mid_tf === 'OFF') || isStrat123;
+    const isHighOff = (activeStrategy === 'strategy_7' && currentConfig && currentConfig.strat7_high_tf === 'OFF') || isStrat123;
 
     if (activeStrategy === 'strategy_7') {
         if (recHeader) recHeader.textContent = "Expiry | ATR";
@@ -265,6 +268,16 @@ function updateScreenerTable(symbol, data) {
             dynamicCols[2].style.display = isHighOff ? 'none' : '';
 
             dynamicCols[3].textContent = "Alignment";
+            dynamicCols[3].style.display = '';
+        }
+    } else if (['strategy_1', 'strategy_2', 'strategy_3'].includes(activeStrategy)) {
+        if (recHeader) recHeader.textContent = "Expiry | ATR";
+        if (dynamicCols.length >= 4) {
+            dynamicCols[0].textContent = "TA Signal";
+            dynamicCols[0].style.display = '';
+            dynamicCols[1].style.display = 'none';
+            dynamicCols[2].style.display = 'none';
+            dynamicCols[3].textContent = "Crossover";
             dynamicCols[3].style.display = '';
         }
     } else {
@@ -305,6 +318,10 @@ function updateScreenerTable(symbol, data) {
             const allSell = activeRecs.length > 0 && activeRecs.every(r => r.includes('SELL'));
             const aligned = allBuy || allSell;
             col4 = aligned ? '<span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Aligned</span>' : '<span class="text-muted">Mixed</span>';
+        } else if (['strategy_1', 'strategy_2', 'strategy_3'].includes(activeStrategy)) {
+            recValue = `${d.expiry_min}m${sessionTag} | ${d.atr || "0.00"}`;
+            col1 = `<span class="badge ${d.signal?.includes('BUY') ? 'bg-success' : (d.signal?.includes('SELL') ? 'bg-danger' : 'bg-secondary')}">${d.signal || 'NEUTRAL'}</span>`;
+            col4 = d.direction === 'CALL' ? '<span class="text-success fw-bold">Above Open</span>' : (d.direction === 'PUT' ? '<span class="text-danger fw-bold">Below Open</span>' : '<span class="text-muted">Neutral</span>');
         } else {
             if (contractType === 'multiplier') {
                 recValue = `x${d.multiplier}${sessionTag} | ${d.atr}`;

@@ -60,12 +60,37 @@ class ScreenerHandler:
 
     def _calculate_scores(self, symbol, indicators, df):
         try:
-            # Simplified scores for the new ta_handler integration
-            # In a real scenario, we'd fetch more indicators, but let's keep it consistent
-            trend = 5.0 # Placeholder
-            momentum = 5.0 # Placeholder
-            volatility = 5.0 # Placeholder
-            structure = 5.0 # Placeholder
+            if df is None or df.empty:
+                return 5.0, 5.0, 5.0, 5.0
+
+            # 1. Trend Score (EMA alignment)
+            ema20 = indicators.get('ema20', df['close'].ewm(span=20).mean().iloc[-1])
+            ema50 = indicators.get('ema50', df['close'].ewm(span=50).mean().iloc[-1])
+            price = df['close'].iloc[-1]
+            trend = 5.0
+            if price > ema20 > ema50: trend = 8.5
+            elif price < ema20 < ema50: trend = 1.5
+
+            # 2. Momentum Score (RSI)
+            rsi = indicators.get('rsi', 50)
+            momentum = round(rsi / 10, 1)
+
+            # 3. Volatility Score (ATR vs MA)
+            atr_series = ta.volatility.AverageTrueRange(df['high'], df['low'], df['close'], window=14).average_true_range()
+            atr_curr = atr_series.iloc[-1]
+            atr_avg = atr_series.rolling(50).mean().iloc[-1]
+            volatility = round((atr_curr / atr_avg) * 5, 1) if atr_avg else 5.0
+
+            # 4. Structure Score (Price Action)
+            candles = []
+            for _, row in df.tail(10).iterrows():
+                candles.append({'open': row['open'], 'high': row['high'], 'low': row['low'], 'close': row['close']})
+            pattern = check_price_action_patterns(candles)
+            structure = 5.0
+            if pattern:
+                if "bullish" in pattern: structure = 7.5
+                elif "bearish" in pattern: structure = 2.5
+
             return trend, momentum, volatility, structure
         except Exception as e:
             logging.error(f"Error calculating scores for {symbol}: {e}")
@@ -97,7 +122,13 @@ class ScreenerHandler:
             df1m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1m"), manager.loop).result()
             expiry = self._get_smart_expiry(df1m, 1, 60)
 
-            trend, momentum, volatility, structure = 5, 5, 5, 5 # Placeholder
+            indicators = get_ta_indicators(symbol, "5m")
+            df5m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "5m"), manager.loop).result()
+            trend, momentum, volatility, structure = self._calculate_scores(symbol, indicators, df5m)
+
+            atr_1m = 0
+            if not df1m.empty:
+                atr_1m = ta.volatility.AverageTrueRange(df1m['high'], df1m['low'], df1m['close']).average_true_range().iloc[-1]
 
             data = {
                 'signal': signal,
@@ -106,7 +137,7 @@ class ScreenerHandler:
                 'confidence': 75,
                 'threshold': 72,
                 'expiry_min': expiry,
-                'atr_1m': 0.1, # Placeholder
+                'atr_1m': round(atr_1m, 4),
                 'trend': trend,
                 'momentum': momentum,
                 'volatility': volatility,
@@ -143,7 +174,13 @@ class ScreenerHandler:
             df1m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1m"), manager.loop).result()
             expiry = self._get_smart_expiry(df1m, 1, 15)
 
-            trend, momentum, volatility, structure = 5, 5, 5, 5 # Placeholder
+            indicators = get_ta_indicators(symbol, "15m")
+            df15m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "15m"), manager.loop).result()
+            trend, momentum, volatility, structure = self._calculate_scores(symbol, indicators, df15m)
+
+            atr_1m = 0
+            if not df1m.empty:
+                atr_1m = ta.volatility.AverageTrueRange(df1m['high'], df1m['low'], df1m['close']).average_true_range().iloc[-1]
 
             data = {
                 'signal': signal,
@@ -152,7 +189,7 @@ class ScreenerHandler:
                 'confidence': 65,
                 'threshold': 60,
                 'expiry_min': expiry,
-                'atr_1m': 0.1, # Placeholder
+                'atr_1m': round(atr_1m, 4),
                 'trend': trend,
                 'momentum': momentum,
                 'volatility': volatility,
@@ -228,6 +265,20 @@ class ScreenerHandler:
                     direction = "PUT"
                     signal = "SELL"
 
+            df_ref = pd.DataFrame()
+            ref_tf = "1h"
+            if h_tf: ref_tf = h_tf
+            elif m_tf: ref_tf = m_tf
+            elif s_tf: ref_tf = s_tf
+
+            df_ref = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, ref_tf), manager.loop).result()
+            indicators = get_ta_indicators(symbol, ref_tf)
+            trend, momentum, volatility, structure = self._calculate_scores(symbol, indicators, df_ref)
+
+            atr_val = 0
+            if not df_ref.empty:
+                atr_val = ta.volatility.AverageTrueRange(df_ref['high'], df_ref['low'], df_ref['close']).average_true_range().iloc[-1]
+
             data = {
                 'confidence': 80 if signal != "WAIT" else 50,
                 'label': label,
@@ -237,9 +288,9 @@ class ScreenerHandler:
                 'summary_small': rec_small,
                 'summary_mid': rec_mid,
                 'summary_high': rec_high,
-                'expiry_min': 5, # Placeholder
-                'atr': 0.1,
-                'trend': 5, 'momentum': 5, 'volatility': 5, 'structure': 5,
+                'expiry_min': 5,
+                'atr': round(atr_val, 4),
+                'trend': trend, 'momentum': momentum, 'volatility': volatility, 'structure': structure,
                 'last_update': time.time()
             }
             self.bot.screener_data[symbol] = data
