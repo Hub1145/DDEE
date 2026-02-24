@@ -256,53 +256,68 @@ def get_smart_multiplier(atr_pct, base_multiplier=100):
 
 def predict_expiry_v5(symbol, strategy_key, ltf_min, htf_min, confidence, signals, df_ltf):
     """
-    Engine to predict expiry time based on strategy, timeframe, ATR and confidence.
-    Signals is a dict: {'small': 'BUY', 'mid': 'STRONG_BUY', 'high': 'BUY'} (for example)
+    Expert Intelligence Expiry Engine.
+    Predicts optimal duration based on ATR volatility, Confidence levels, and Candle Velocity.
     """
+    # 1. Get ATR Volatility (Price Speed per candle)
     atr = 0
     if df_ltf is not None and not df_ltf.empty:
         atr_series = ta.volatility.average_true_range(df_ltf['high'], df_ltf['low'], df_ltf['close'], window=14)
         atr = atr_series.iloc[-1]
 
-    # Default is the Mid TF
+    # 2. Strategy-Specific Logic
+    if strategy_key in ['strategy_5', 'strategy_6']:
+        # For Strategy 5 & 6, we predict based on distance to be traveled.
+        # We assume price needs to travel ~1.0x ATR to be safely in the money.
+        # Speed = ATR per candle.
+        # Time = Distance / Speed.
+        # Confidence factor: Higher confidence = Faster arrival suspected.
+
+        # Suspected candles: High confidence (1-2 candles), low confidence (4-5 candles)
+        target_candles = 5 - int(4 * (confidence / 100))
+        target_candles = max(1, min(5, target_candles))
+
+        base_expiry = target_candles * (ltf_min or 1)
+
+        # Fine-tune based on current vs avg volatility
+        if atr > 0 and not df_ltf.empty:
+            avg_atr = ta.volatility.average_true_range(df_ltf['high'], df_ltf['low'], df_ltf['close'], window=50).mean()
+            if avg_atr > 0:
+                # If current volatility is high, price travels faster -> Reduce expiry
+                vol_ratio = atr / avg_atr
+                if vol_ratio > 1.3: base_expiry = max(1, int(base_expiry * 0.8))
+                elif vol_ratio < 0.7: base_expiry = int(base_expiry * 1.2)
+
+        return max(1, base_expiry)
+
+    # Strategy 7 specific multi-TF alignment logic
     base_expiry = 5
-    if ltf_min: base_expiry = ltf_min * 3 # e.g. 1m -> 3m
+    if ltf_min: base_expiry = ltf_min * 3
 
     if strategy_key == 'strategy_7':
         s = signals.get('small', 'NEUTRAL')
         m = signals.get('mid', 'NEUTRAL')
         h = signals.get('high', 'NEUTRAL')
 
-        # 2 Timeframes active (Small & Mid)
         if m != 'OFF' and s != 'OFF' and h == 'OFF':
             if "STRONG" in m and "STRONG" not in s:
-                # Shorter expiry (1m to 4m)
                 base_expiry = max(1, min(4, int(4 * (confidence/100))))
             else:
-                base_expiry = 5 # 5m
-
-        # 3 Timeframes active
+                base_expiry = 5
         elif h != 'OFF' and m != 'OFF' and s != 'OFF':
             if "STRONG" in h and "STRONG" in m:
-                # Very short (< 5m)
                 base_expiry = max(1, min(4, int(5 * (1 - confidence/100))))
             elif "STRONG" in h:
-                # 5m to 20m
                 base_expiry = max(5, min(20, int(20 * (1 - confidence/100))))
             else:
-                # Match but not strong -> Less than 1h (e.g. 30m)
                 base_expiry = 30
 
-    # Fine-tune based on ATR
-    # If ATR is high, price reaches targets faster -> shorter expiry
     if atr > 0 and df_ltf is not None and not df_ltf.empty:
         avg_atr = ta.volatility.average_true_range(df_ltf['high'], df_ltf['low'], df_ltf['close'], window=50).mean()
         if avg_atr > 0:
             ratio = atr / avg_atr
-            if ratio > 1.5: # High volatility
-                base_expiry = max(1, int(base_expiry * 0.7))
-            elif ratio < 0.5: # Low volatility
-                base_expiry = int(base_expiry * 1.3)
+            if ratio > 1.5: base_expiry = max(1, int(base_expiry * 0.7))
+            elif ratio < 0.5: base_expiry = int(base_expiry * 1.3)
 
     return max(1, base_expiry)
 
