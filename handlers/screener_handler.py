@@ -460,23 +460,38 @@ class ScreenerHandler:
                                (("BUY" in rec_small or "NEUTRAL" in rec_small) if tf_small else False)
 
             label = "NEUTRAL"
-            if quick_buy: label = "QUICK_BUY"
-            elif quick_sell: label = "QUICK_SELL"
-            elif all_buy: label = "ALIGNED_BUY"
-            elif all_sell: label = "ALIGNED_SELL"
-            elif is_pullback_buy: label = "PULLBACK_BUY"
-            elif is_pullback_sell: label = "PULLBACK_SELL"
-
-            # Suggested expiry for Strategy 7 (based on mid TF)
             suggested_expiry = 5
-            if tf_mid:
-                if tf_mid.value >= 3600: suggested_expiry = 60
-                elif tf_mid.value >= 900: suggested_expiry = 15
-                elif tf_mid.value >= 300: suggested_expiry = 5
 
-            # Reduce expiry for quick entries
-            if quick_buy or quick_sell:
-                suggested_expiry = max(1, suggested_expiry // 2)
+            if len(enabled_analyses) == 1:
+                name, a = enabled_analyses[0]
+                rec = a.summary['RECOMMENDATION']
+                # Buy on BUY, Sell on SELL, skip STRONG
+                if rec == "BUY": label = "ALIGNED_BUY"
+                elif rec == "SELL": label = "ALIGNED_SELL"
+
+                # Match expiry to the single enabled timeframe
+                tf_val = int(self.bot.config.get(f'strat7_{name}_tf', 60))
+                suggested_expiry = tf_val // 60
+            else:
+                if quick_buy: label = "QUICK_BUY"
+                elif quick_sell: label = "QUICK_SELL"
+                elif all_buy: label = "ALIGNED_BUY"
+                elif all_sell: label = "ALIGNED_SELL"
+                elif is_pullback_buy: label = "PULLBACK_BUY"
+                elif is_pullback_sell: label = "PULLBACK_SELL"
+
+                # Suggested expiry for multi-TF (based on mid TF if enabled, else highest)
+                if tf_mid:
+                    if tf_mid.value >= 3600: suggested_expiry = 60
+                    elif tf_mid.value >= 900: suggested_expiry = 15
+                    elif tf_mid.value >= 300: suggested_expiry = 5
+                elif tf_high:
+                    if tf_high.value >= 86400: suggested_expiry = 1440
+                    elif tf_high.value >= 3600: suggested_expiry = 60
+
+                # Reduce expiry for quick entries
+                if quick_buy or quick_sell:
+                    suggested_expiry = max(1, suggested_expiry // 2)
 
             self.bot.screener_data[symbol] = {
                 'confidence': round(confidence, 1),
