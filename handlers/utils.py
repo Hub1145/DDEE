@@ -254,64 +254,67 @@ def get_smart_multiplier(atr_pct, base_multiplier=100):
     # Constrain to sensible limits (e.g. 10x to 500x)
     return int(max(10, min(500, multiplier)))
 
-def predict_expiry_v5(symbol, strategy_key, ltf_min, htf_min, confidence, signals, df_ltf):
+def predict_expiry_v5(symbol, strategy_key, ltf_min, htf_min, confidence, fcast_data, df_ltf):
     """
-    Expert Intelligence Expiry Engine.
-    Predicts optimal duration based on ATR volatility, Confidence levels, and Candle Velocity.
+    Expert Intelligence Expiry Engine (Enhanced with Echo Forecast).
+    Predicts optimal duration based on ATR velocity, Confidence, and Historical Fractal Echoes.
     """
-    # 1. Get ATR Volatility (Price Speed per candle)
+    # 1. Base Intelligence from ATR Speed
     atr = 0
     if df_ltf is not None and not df_ltf.empty:
         atr_series = ta.volatility.average_true_range(df_ltf['high'], df_ltf['low'], df_ltf['close'], window=14)
         atr = atr_series.iloc[-1]
 
-    # 2. Strategy-Specific Logic
-    if strategy_key in ['strategy_5', 'strategy_6']:
-        # For Strategy 5 & 6, we predict based on distance to be traveled.
-        # We assume price needs to travel ~1.0x ATR to be safely in the money.
-        # Speed = ATR per candle.
-        # Time = Distance / Speed.
-        # Confidence factor: Higher confidence = Faster arrival suspected.
-
-        # Suspected candles: High confidence (1-2 candles), low confidence (4-5 candles)
-        target_candles = 5 - int(4 * (confidence / 100))
-        target_candles = max(1, min(5, target_candles))
-
-        base_expiry = target_candles * (ltf_min or 1)
-
-        # Fine-tune based on current vs avg volatility
-        if atr > 0 and not df_ltf.empty:
-            avg_atr = ta.volatility.average_true_range(df_ltf['high'], df_ltf['low'], df_ltf['close'], window=50).mean()
-            if avg_atr > 0:
-                # If current volatility is high, price travels faster -> Reduce expiry
-                vol_ratio = atr / avg_atr
-                if vol_ratio > 1.3: base_expiry = max(1, int(base_expiry * 0.8))
-                elif vol_ratio < 0.7: base_expiry = int(base_expiry * 1.2)
-
-        return max(1, base_expiry)
-
-    # Strategy 7 specific multi-TF alignment logic
     base_expiry = 5
     if ltf_min: base_expiry = ltf_min * 3
 
-    if strategy_key == 'strategy_7':
+    # 2. Echo Forecast Intelligence (LuxAlgo-inspired)
+    # If we have a high-correlation echo, we use its structure to suspect expiry.
+    if fcast_data and 'correlation' in fcast_data and fcast_data['correlation'] > 0.5:
+        correlation = fcast_data['correlation']
+        # We look at the projected range. If projected price reaches 1x ATR distance,
+        # we set expiry to that suspicion point.
+        curr_price = df_ltf['close'].iloc[-1] if df_ltf is not None else 0
+        target_move = atr * 1.0
+
+        # For simplicity, we assume linear progression if we don't have individual fcast prices here
+        # But we can use the 'final' projected price to suspect velocity.
+        projected_total_move = abs(fcast_data.get('final', curr_price) - curr_price)
+
+        if projected_total_move > 0:
+            # How many candles to reach target move?
+            # Suspected candles = (Target Move / Projected Move) * Forecast Window (50)
+            # Scaled by confidence
+            suspected_candles = (target_move / projected_total_move) * 50
+            suspected_candles = suspected_candles * (1.2 - (confidence/100)) # High confidence = faster
+
+            base_expiry = max(1, min(fcast_data.get('window', 50), int(suspected_candles)))
+
+            # Convert to minutes if needed
+            if strategy_key in ['strategy_5', 'strategy_6']:
+                base_expiry = base_expiry * (ltf_min or 1)
+
+        return max(1, base_expiry)
+
+    # 3. Fallback Strategy-Specific Logic
+    if strategy_key in ['strategy_5', 'strategy_6']:
+        target_candles = 5 - int(4 * (confidence / 100))
+        base_expiry = max(1, min(5, target_candles)) * (ltf_min or 1)
+
+    elif strategy_key == 'strategy_7':
+        signals = fcast_data.get('signals', {})
         s = signals.get('small', 'NEUTRAL')
         m = signals.get('mid', 'NEUTRAL')
         h = signals.get('high', 'NEUTRAL')
 
         if m != 'OFF' and s != 'OFF' and h == 'OFF':
-            if "STRONG" in m and "STRONG" not in s:
-                base_expiry = max(1, min(4, int(4 * (confidence/100))))
-            else:
-                base_expiry = 5
+            base_expiry = max(1, min(4, int(4 * (confidence/100)))) if "STRONG" in m else 5
         elif h != 'OFF' and m != 'OFF' and s != 'OFF':
-            if "STRONG" in h and "STRONG" in m:
-                base_expiry = max(1, min(4, int(5 * (1 - confidence/100))))
-            elif "STRONG" in h:
-                base_expiry = max(5, min(20, int(20 * (1 - confidence/100))))
-            else:
-                base_expiry = 30
+            if "STRONG" in h and "STRONG" in m: base_expiry = max(1, min(4, int(5 * (1 - confidence/100))))
+            elif "STRONG" in h: base_expiry = max(5, min(20, int(20 * (1 - confidence/100))))
+            else: base_expiry = 30
 
+    # Fine-tune Volatility
     if atr > 0 and df_ltf is not None and not df_ltf.empty:
         avg_atr = ta.volatility.average_true_range(df_ltf['high'], df_ltf['low'], df_ltf['close'], window=50).mean()
         if avg_atr > 0:
@@ -321,24 +324,103 @@ def predict_expiry_v5(symbol, strategy_key, ltf_min, htf_min, confidence, signal
 
     return max(1, base_expiry)
 
-def get_smart_targets(entry_price, side, atr, confidence):
+def get_smart_targets(entry_price, side, atr, confidence, fcast_data=None):
     """
-    Calculate TP/SL targets based on ATR and confidence level.
-    A higher confidence level might allow for a wider TP (letting winners run).
+    Expert Intelligence TP/SL Engine (Enhanced with Echo Forecast).
+    Uses ATR and Projected Market Structure to set optimal targets.
     """
     if atr == 0:
         return None, None
 
     is_long = side == 'long'
 
-    # Base risk is 1.5x ATR
+    # 1. Base ATR Risk (1.5x ATR for SL)
     sl_dist = 1.5 * atr
 
-    # TP is scaled by confidence (1:2 to 1:5 risk reward)
+    # 2. Echo Structure Alignment
+    # If forecast shows a clear structure peak/trough, we use it to cap or extend TP.
+    fcast_tp_dist = 0
+    if fcast_data and 'correlation' in fcast_data and fcast_data['correlation'] > 0.6:
+        fcast_high = fcast_data.get('high')
+        fcast_low = fcast_data.get('low')
+
+        if is_long and fcast_high:
+            fcast_tp_dist = fcast_high - entry_price
+        elif not is_long and fcast_low:
+            fcast_tp_dist = entry_price - fcast_low
+
+    # 3. Dynamic Risk Reward (2x to 5x base risk)
     rr = 2 + (3 * (confidence / 100))
     tp_dist = sl_dist * rr
+
+    # If Echo projects a larger move with high confidence, we let it run
+    if fcast_tp_dist > tp_dist:
+        tp_dist = fcast_tp_dist
 
     tp_price = (entry_price + tp_dist) if is_long else (entry_price - tp_dist)
     sl_price = (entry_price - sl_dist) if is_long else (entry_price + sl_dist)
 
     return tp_price, sl_price
+
+def calculate_echo_forecast(df, eval_window=50, forecast_window=50):
+    """
+    Expert Intelligence Echo Forecast (LuxAlgo Port).
+    Identifies historical fractal similarities and projects current price action.
+    Returns: (forecast_prices, correlation_score)
+    """
+    if df is None or len(df) < (eval_window + forecast_window * 2 + 1):
+        return None, 0
+
+    src = df['close'].values
+    deltas = df['close'].diff().values
+
+    # Reference window: last 'forecast_window' bars (current action)
+    ref = src[-forecast_window:]
+
+    best_r = -1.0
+    best_k = 0
+
+    # Slide evaluation window through history to find the 'Echo'
+    # Step backward from history
+    for i in range(eval_window):
+        # Slicing from the end
+        # match_end_idx is the index just before the reference window started
+        # match_start_idx is 'forecast_window' bars before that
+        match_end_idx = len(src) - forecast_window - i
+        match_start_idx = match_end_idx - forecast_window
+
+        if match_start_idx < 0:
+            break
+
+        b = src[match_start_idx:match_end_idx]
+
+        # Pearson Correlation
+        std_ref = np.std(ref)
+        std_b = np.std(b)
+
+        if std_ref == 0 or std_b == 0:
+            r = 0
+        else:
+            r = np.corrcoef(ref, b)[0, 1]
+
+        if not np.isnan(r) and r > best_r:
+            best_r = r
+            best_k = i
+
+    # Construct the Echo Forecast using price changes that followed the matched window
+    # matched_window_end_at = len(src) - forecast_window - best_k
+    match_end = len(src) - forecast_window - best_k
+
+    # Use the deltas that occurred immediately after the matched historical window
+    forecast_deltas = deltas[match_end : match_end + forecast_window]
+
+    current_price = src[-1]
+    forecast_prices = []
+    temp_price = current_price
+
+    for d in forecast_deltas:
+        if np.isnan(d): d = 0
+        temp_price += d
+        forecast_prices.append(temp_price)
+
+    return forecast_prices, best_r

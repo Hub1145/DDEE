@@ -101,14 +101,8 @@ class StrategyHandler:
         # Execute with smart metadata
         self.bot.log(f"Strategy {strat_key} triggered {signal} for {symbol} based on screener.")
 
-        # Pass smart metadata to execute_trade
-        metadata = {
-            'confidence': data.get('confidence', 50),
-            'expiry_min': data.get('expiry_min', 5),
-            'atr': data.get('atr_1m') or data.get('atr') or 0
-        }
-
-        self.bot._execute_trade(symbol, 'buy' if signal == 'BUY' else 'sell', metadata=metadata)
+        # Pass full screener data as metadata to execute_trade
+        self.bot._execute_trade(symbol, 'buy' if signal == 'BUY' else 'sell', metadata=data)
 
     def _process_strategy_1(self, symbol, is_candle_close):
         self._generic_crossover_strategy(symbol, is_candle_close, 1, "15m", 86400)

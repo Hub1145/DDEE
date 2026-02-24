@@ -1122,31 +1122,29 @@ class TradingBotEngine:
         stake = c['stake']
         multiplier = c.get('multiplier')
         side = c['side'] # 'long' or 'short'
+        internal_side = 'long' if side == 'long' else 'short'
 
         if not (tp_val > 0 or sl_val > 0): return
 
-        # Calculate threshold in USD
-        tp_usd = tp_val if use_fixed else (stake * tp_val / 100.0)
-        sl_usd = sl_val if use_fixed else (stake * sl_val / 100.0)
-
         if multiplier:
-            # Check if Strategy 5 generated specific levels
-            metrics = self.screener_data.get(c['symbol'])
+            # Expert Intelligence Target Selection
+            metrics = self.screener_data.get(c['symbol'], {})
             strat_key = self.config.get('active_strategy')
 
-            if strat_key == 'strategy_5' and metrics:
-                tp_pips = metrics.get('tp_pips', 0)
-                sl_pips = metrics.get('sl_pips', 0)
-                if side == 'long':
-                    self.contracts[cid]['tp_price'] = entry + tp_pips
-                    self.contracts[cid]['sl_price'] = entry - sl_pips
-                else:
-                    self.contracts[cid]['tp_price'] = entry - tp_pips
-                    self.contracts[cid]['sl_price'] = entry + sl_pips
+            # Use Smart TP/SL engine for Strategies 5, 6, 7
+            if strat_key in ['strategy_5', 'strategy_6', 'strategy_7']:
+                atr = metrics.get('atr_1m') or metrics.get('atr') or (entry * 0.001)
+                confidence = metrics.get('confidence', 50)
+
+                tp_price, sl_price = get_smart_targets(entry, internal_side, atr, confidence, fcast_data=metrics)
+
+                if tp_price: self.contracts[cid]['tp_price'] = tp_price
+                if sl_price: self.contracts[cid]['sl_price'] = sl_price
             else:
-                # Fallback to fixed USD/percentage TP/SL
-                # Profit = (Price - Entry) / Entry * Multiplier * Stake
-                # Price = Entry * (1 + Profit / (Multiplier * Stake))
+                # Fallback to fixed USD/percentage TP/SL for simple breakout strategies
+                tp_usd = tp_val if use_fixed else (stake * tp_val / 100.0)
+                sl_usd = sl_val if use_fixed else (stake * sl_val / 100.0)
+
                 denom = multiplier * stake
                 if denom == 0: return
 

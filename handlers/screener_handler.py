@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from handlers.ta_handler import get_ta_signal, get_ta_indicators, fetch_candles, manager
 from handlers.utils import (
     calculate_snr_zones, check_price_action_patterns, score_reversal_pattern,
-    predict_expiry_v5
+    predict_expiry_v5, calculate_echo_forecast
 )
 
 class ScreenerHandler:
@@ -127,7 +127,27 @@ class ScreenerHandler:
             trend, momentum, volatility, structure = self._calculate_scores(symbol, indicators, df5m)
 
             confidence = 75 # Standard for alignment
-            expiry = predict_expiry_v5(symbol, 'strategy_5', 1, 60, confidence, {}, df1m)
+
+            # 1. Echo Forecast Intelligence
+            fcast_prices, correlation = calculate_echo_forecast(df5m)
+            fcast_data = {}
+            if fcast_prices:
+                fcast_high = max(fcast_prices)
+                fcast_low = min(fcast_prices)
+                fcast_final = fcast_prices[-1]
+
+                # Boost confidence if Echo agrees with Signal
+                if signal == 'BUY' and fcast_final > df5m['close'].iloc[-1]:
+                    confidence += (correlation * 15)
+                elif signal == 'SELL' and fcast_final < df5m['close'].iloc[-1]:
+                    confidence += (correlation * 15)
+
+                fcast_data = {
+                    'high': fcast_high, 'low': fcast_low, 'final': fcast_final,
+                    'correlation': correlation
+                }
+
+            expiry = predict_expiry_v5(symbol, 'strategy_5', 1, 60, confidence, fcast_data, df1m)
 
             atr_1m = 0
             if not df1m.empty:
@@ -181,7 +201,24 @@ class ScreenerHandler:
             trend, momentum, volatility, structure = self._calculate_scores(symbol, indicators, df15m)
 
             confidence = 65
-            expiry = predict_expiry_v5(symbol, 'strategy_6', 1, 15, confidence, {}, df1m)
+
+            # 1. Echo Forecast Intelligence
+            df15m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "15m"), manager.loop).result()
+            fcast_prices, correlation = calculate_echo_forecast(df15m)
+            fcast_data = {}
+            if fcast_prices:
+                fcast_final = fcast_prices[-1]
+                if signal == 'BUY' and fcast_final > df15m['close'].iloc[-1]:
+                    confidence += (correlation * 20)
+                elif signal == 'SELL' and fcast_final < df15m['close'].iloc[-1]:
+                    confidence += (correlation * 20)
+
+                fcast_data = {
+                    'high': max(fcast_prices), 'low': min(fcast_prices),
+                    'final': fcast_final, 'correlation': correlation
+                }
+
+            expiry = predict_expiry_v5(symbol, 'strategy_6', 1, 15, confidence, fcast_data, df1m)
 
             atr_1m = 0
             if not df1m.empty:
@@ -283,9 +320,24 @@ class ScreenerHandler:
             confidence = 80 if signal != "WAIT" else 50
             if "STRONG" in str(active_recs): confidence = 90
 
+            # Echo Forecast Intelligence (Use Mid TF for Echo)
+            df_echo = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, m_tf or "5m"), manager.loop).result()
+            fcast_prices, correlation = calculate_echo_forecast(df_echo)
+            fcast_data = {'signals': {'small': rec_small, 'mid': rec_mid, 'high': rec_high}}
+            if fcast_prices:
+                fcast_final = fcast_prices[-1]
+                if signal == 'BUY' and fcast_final > df_echo['close'].iloc[-1]:
+                    confidence = min(100, confidence + (correlation * 10))
+                elif signal == 'SELL' and fcast_final < df_echo['close'].iloc[-1]:
+                    confidence = min(100, confidence + (correlation * 10))
+
+                fcast_data.update({
+                    'high': max(fcast_prices), 'low': min(fcast_prices),
+                    'final': fcast_final, 'correlation': correlation
+                })
+
             df_ltf = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, s_tf or "1m"), manager.loop).result()
-            expiry = predict_expiry_v5(symbol, 'strategy_7', 1, 60, confidence,
-                                      {'small': rec_small, 'mid': rec_mid, 'high': rec_high}, df_ltf)
+            expiry = predict_expiry_v5(symbol, 'strategy_7', 1, 60, confidence, fcast_data, df_ltf)
 
             atr_val = 0
             if not df_ref.empty:
