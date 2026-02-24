@@ -187,7 +187,8 @@ class StrategyHandler:
             sd['snr_zones'] = remaining_zones
             zones = remaining_zones
 
-        if not is_candle_close: return
+        entry_type = self.bot.config.get('entry_type', 'candle_close')
+        if entry_type == 'candle_close' and not is_candle_close: return
         if not zones: return
 
         for cid, c in self.bot.contracts.items():

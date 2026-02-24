@@ -172,7 +172,7 @@ class ScreenerHandler:
                 'last_update': time.time()
             }
             self.bot.screener_data[symbol] = data
-            logging.info(f"Strategy 5 update for {symbol}: {data['direction']} | {data['signal']} | Expiry: {data['expiry_min']}m")
+            logging.info(f"Strategy 5 update for {symbol}: {data['direction']} | {data['signal']} | Expiry: {data['expiry_min']}m | Trend: {data['trend']} | Mom: {data['momentum']} | Vol: {data['volatility']} | Struct: {data['structure']}")
             self.bot.emit('screener_update', {'symbol': symbol, 'data': data})
             return data
         except Exception as e:
@@ -227,7 +227,7 @@ class ScreenerHandler:
                 'last_update': time.time()
             }
             self.bot.screener_data[symbol] = data
-            logging.info(f"Strategy 6 update for {symbol}: {data['direction']} | {data['signal']} | Expiry: {data['expiry_min']}m")
+            logging.info(f"Strategy 6 update for {symbol}: {data['direction']} | {data['signal']} | Expiry: {data['expiry_min']}m | Trend: {data['trend']} | Mom: {data['momentum']} | Vol: {data['volatility']} | Struct: {data['structure']}")
             self.bot.emit('screener_update', {'symbol': symbol, 'data': data})
             return data
         except Exception as e:
@@ -271,6 +271,11 @@ class ScreenerHandler:
                 'timestamp': time.time()
             }
 
+            def filter_strong(rec):
+                if rec == "STRONG_BUY": return "BUY"
+                if rec == "STRONG_SELL": return "SELL"
+                return rec
+
             rec_small = a_small.summary['RECOMMENDATION'] if a_small else "OFF"
             rec_mid = a_mid.summary['RECOMMENDATION'] if a_mid else "OFF"
             rec_high = a_high.summary['RECOMMENDATION'] if a_high else "OFF"
@@ -298,42 +303,45 @@ class ScreenerHandler:
             direction = "NEUTRAL"
             signal = "WAIT"
 
+            # Sort handlers by interval to identify smallest/biggest correctly
+            enabled_handlers.sort(key=lambda x: x.interval.value)
+            recs = [h.get_analysis().summary['RECOMMENDATION'] for h in enabled_handlers]
+
             if len(enabled_handlers) == 1:
-                h = enabled_handlers[0]
-                rec = h.get_analysis().summary['RECOMMENDATION']
-                if rec == "BUY":
+                # IN ONE TIMEFRAME IGNORE STRONG BU AND STONG SELL (treat them as BUY/SELL)
+                rec = recs[0]
+                if "BUY" in rec:
                     label = "ALIGNED_BUY"
                     direction = "CALL"
                     signal = "BUY"
-                elif rec == "SELL":
+                elif "SELL" in rec:
                     label = "ALIGNED_SELL"
                     direction = "PUT"
                     signal = "SELL"
+
+                # Update individual TF summaries to hide STRONG for 1-TF mode
+                rec_small = filter_strong(rec_small)
+                rec_mid = filter_strong(rec_mid)
+                rec_high = filter_strong(rec_high)
             elif len(enabled_handlers) > 1:
-                enabled_analyses = [h.get_analysis() for h in enabled_handlers]
-                all_buy = all("BUY" in a.summary['RECOMMENDATION'] for a in enabled_analyses)
-                all_sell = all("SELL" in a.summary['RECOMMENDATION'] for a in enabled_analyses)
+                biggest_rec = recs[-1]
+                smaller_recs = recs[:-1]
 
-                quick_buy = False
-                quick_sell = False
-                if a_high and a_small:
-                    quick_buy = "STRONG_BUY" in a_high.summary['RECOMMENDATION'] and "BUY" in a_small.summary['RECOMMENDATION']
-                    quick_sell = "STRONG_SELL" in a_high.summary['RECOMMENDATION'] and "SELL" in a_small.summary['RECOMMENDATION']
+                all_buy = all("BUY" in r for r in recs)
+                all_sell = all("SELL" in r for r in recs)
 
-                if quick_buy:
-                    label = "QUICK_BUY"
-                    direction = "CALL"
-                    signal = "BUY"
-                elif quick_sell:
-                    label = "QUICK_SELL"
-                    direction = "PUT"
-                    signal = "SELL"
-                elif all_buy:
-                    label = "ALIGNED_BUY"
+                if all_buy:
+                    if "STRONG" in biggest_rec:
+                        label = "QUICK_BUY"
+                    else:
+                        label = "ALIGNED_BUY"
                     direction = "CALL"
                     signal = "BUY"
                 elif all_sell:
-                    label = "ALIGNED_SELL"
+                    if "STRONG" in biggest_rec:
+                        label = "QUICK_SELL"
+                    else:
+                        label = "ALIGNED_SELL"
                     direction = "PUT"
                     signal = "SELL"
 
@@ -376,7 +384,7 @@ class ScreenerHandler:
                 'last_update': time.time()
             }
             self.bot.screener_data[symbol] = data
-            logging.info(f"Strategy 7 update for {symbol}: {data['direction']} | {data['signal']} | Expiry: {data['expiry_min']}m")
+            logging.info(f"Strategy 7 update for {symbol}: {data['direction']} | {data['signal']} | Expiry: {data['expiry_min']}m | Label: {data['label']}")
             self.bot.emit('screener_update', {'symbol': symbol, 'data': data})
             return data
         except Exception as e:

@@ -1,7 +1,7 @@
 const socket = io();
 
-let currentConfig = null;
-let activeStrategy = 'strategy_1';
+var currentConfig = null;
+var activeStrategy = 'strategy_1';
 const configModal = new bootstrap.Modal(document.getElementById('configModal'));
 let isBotRunning = false;
 let activeTrades = [];
@@ -232,7 +232,8 @@ function setupSocketListeners() {
     });
 }
 
-const screenerDataMap = {};
+let screenerDataMap = {};
+window.screenerDataMap = screenerDataMap;
 
 function updateScreenerTable(symbol, data) {
     if (symbol && data) {
@@ -299,7 +300,10 @@ function updateScreenerTable(symbol, data) {
             col2 = `<span class="badge ${d.summary_mid?.includes('BUY') ? 'bg-success' : (d.summary_mid?.includes('SELL') ? 'bg-danger' : 'bg-secondary')}">${d.summary_mid || 'NEUTRAL'}</span>`;
             col3 = `<span class="badge ${d.summary_high?.includes('BUY') ? 'bg-success' : (d.summary_high?.includes('SELL') ? 'bg-danger' : 'bg-secondary')}">${d.summary_high || 'NEUTRAL'}</span>`;
 
-            const aligned = (d.summary_small === d.summary_mid && d.summary_mid === d.summary_high && d.summary_mid !== 'NEUTRAL');
+            const activeRecs = [d.summary_small, d.summary_mid, d.summary_high].filter(r => r && r !== 'OFF');
+            const allBuy = activeRecs.length > 0 && activeRecs.every(r => r.includes('BUY'));
+            const allSell = activeRecs.length > 0 && activeRecs.every(r => r.includes('SELL'));
+            const aligned = allBuy || allSell;
             col4 = aligned ? '<span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Aligned</span>' : '<span class="text-muted">Mixed</span>';
         } else {
             if (contractType === 'multiplier') {
