@@ -9,7 +9,7 @@ import websocket
 import pandas as pd
 import numpy as np
 import ta
-from handlers.ta_handler import DerivTA, Interval, manager
+from handlers.ta_handler import manager
 from handlers.screener_handler import ScreenerHandler
 from handlers.strategy_handler import StrategyHandler
 from handlers.utils import (
@@ -21,20 +21,20 @@ from handlers.utils import (
 class TradingBotEngine:
     STRATEGY_MAP = {
         'strategy_1': {
-            'name': 'Slow (Daily / 1h)',
+            'name': 'Slow (Daily / 15m)',
             'htf_granularity': 86400, # Daily
-            'ltf_granularity': 3600,  # 1h (Hardcoded per req)
+            'ltf_granularity': 900,   # 15m
             'expiry_type': 'eod'      # End of Day
         },
         'strategy_2': {
-            'name': 'Moderate',
+            'name': 'Moderate (1h / 3m)',
             'htf_granularity': 3600,  # 1h
             'ltf_granularity': 180,   # 3m
             'expiry_type': 'fixed',
             'duration': 3600          # 1 hour
         },
         'strategy_3': {
-            'name': 'Fast',
+            'name': 'Fast (15m / 1m)',
             'htf_granularity': 900,   # 15m
             'ltf_granularity': 60,    # 1m
             'expiry_type': 'fixed',
@@ -792,28 +792,18 @@ class TradingBotEngine:
             expiry_label = f"Expiry: {end_of_day.strftime('%H:%M:%S')} UTC"
 
         elif strat_key == 'strategy_2':
-            # v4.0 Distance-Based Expiry:
-            # If moved > 1 ATR away from 1H open, reduce to 30m
-            duration_seconds = 3600
-            if len(sd.get('htf_candles', [])) >= 14:
-                df_h = pd.DataFrame(sd['htf_candles'])
-                h1_atr = ta.volatility.AverageTrueRange(df_h['high'], df_h['low'], df_h['close']).average_true_range().iloc[-1]
-                dist = abs(sd['last_tick'] - sd['htf_open'])
-                if dist > h1_atr:
-                    duration_seconds = 1800
-                    self.log(f"Strategy 2: Exhaustion detected (dist {dist:.2f} > ATR {h1_atr:.2f}). Reducing expiry to 30m.")
-
-            expiry_label = f"Expiry: {duration_seconds // 60}m"
-
-        elif strat_key == 'strategy_3':
-            # v4.0 Dynamic Expiry: remaining time on current 15m candle + 2m
-            htf_gran = 900 # 15m
+            # Remaining time for 1h candle
+            htf_gran = 3600
             next_close_epoch = ((int(now.timestamp()) // htf_gran) + 1) * htf_gran
-            duration_seconds = (next_close_epoch - int(now.timestamp())) + 120
+            duration_seconds = max(15, next_close_epoch - int(now.timestamp()))
             expiry_label = f"Expiry: {duration_seconds // 60}m {duration_seconds % 60}s"
 
-            # Increment trade count for hourly cap
-            sd['hourly_trade_count'] = sd.get('hourly_trade_count', 0) + 1
+        elif strat_key == 'strategy_3':
+            # Remaining time for 15m candle
+            htf_gran = 900
+            next_close_epoch = ((int(now.timestamp()) // htf_gran) + 1) * htf_gran
+            duration_seconds = max(15, next_close_epoch - int(now.timestamp()))
+            expiry_label = f"Expiry: {duration_seconds // 60}m {duration_seconds % 60}s"
 
         elif strat_key in ['strategy_5', 'strategy_6', 'strategy_7']:
             metrics = self.screener_data.get(symbol, {})
@@ -1322,6 +1312,9 @@ class TradingBotEngine:
         except: return False
 
     def apply_live_config_update(self, new_config):
+        if 'deriv_app_id' in new_config:
+            manager.set_app_id(new_config['deriv_app_id'])
+
         old_symbols = set(self.config.get('symbols', []))
         new_symbols = set(new_config.get('symbols', []))
 

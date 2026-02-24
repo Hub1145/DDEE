@@ -3,15 +3,26 @@ import ta
 import numpy as np
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from handlers.utils import (
     calculate_supertrend, detect_macd_divergence, check_price_action_patterns,
     score_reversal_pattern, calculate_snr_zones
 )
+from handlers.ta_handler import get_ta_signal
 
 class StrategyHandler:
     def __init__(self, bot_engine):
         self.bot = bot_engine
+        self.last_prices = {} # symbol -> price
+
+    def _get_expiry_seconds(self, interval_sec):
+        now = datetime.now(timezone.utc)
+        now_ts = int(now.timestamp())
+        if interval_sec == 86400: # Daily
+            next_close = ((now_ts // 86400) + 1) * 86400
+        else:
+            next_close = ((now_ts // interval_sec) + 1) * interval_sec
+        return max(15, next_close - now_ts)
 
     def process_strategy(self, symbol, is_candle_close):
         # 1. Risk Management: Max Daily Profit/Loss
@@ -55,6 +66,8 @@ class StrategyHandler:
         elif strat_key == 'strategy_4':
             self._process_strategy_4(symbol, is_candle_close)
 
+        self.last_prices[symbol] = current_price
+
     def _process_screener_based_strategy(self, symbol, strat_key):
         data = self.bot.screener_data.get(symbol)
         if not data: return
@@ -77,96 +90,61 @@ class StrategyHandler:
         self.bot._execute_trade(symbol, 'buy' if signal == 'BUY' else 'sell')
 
     def _process_strategy_1(self, symbol, is_candle_close):
-        sd = self.bot.symbol_data[symbol]
-        htf_open = sd.get('htf_open')
-        current_price = sd.get('last_tick')
-        current_ltf = sd.get('current_ltf_candle')
-
-        if htf_open is None or current_price is None or current_ltf is None: return
-
-        # Track crosses
-        self.bot._track_daily_open_crosses(symbol, current_price)
-        if sd.get('daily_crosses', 0) > 3: return # Whipsaw limit
-
-        # Check if already in position
-        for cid, c in self.bot.contracts.items():
-            if c['symbol'] == symbol: return
-
-        trend_bias = None
-        if len(sd.get('h4_candles', [])) >= 100:
-            df_h4 = pd.DataFrame(sd['h4_candles'])
-            ema100_h4 = ta.trend.EMAIndicator(df_h4['close'], window=100).ema_indicator().iloc[-1]
-            trend_bias = 'buy' if current_price > ema100_h4 else 'sell'
-
-        signal = None
-        if current_ltf['open'] <= htf_open and current_price > htf_open and current_price > current_ltf['open']:
-            if trend_bias is None or trend_bias == 'buy': signal = 'buy'
-        elif current_ltf['open'] >= htf_open and current_price < htf_open and current_price < current_ltf['open']:
-            if trend_bias is None or trend_bias == 'sell': signal = 'sell'
-
-        if signal:
-            self.bot.log(f"Strategy 1 triggered {signal} for {symbol}")
-            self.bot._execute_trade(symbol, signal)
+        self._generic_crossover_strategy(symbol, is_candle_close, 1, "15m", 86400)
 
     def _process_strategy_2(self, symbol, is_candle_close):
-        sd = self.bot.symbol_data[symbol]
-        htf_open = sd.get('htf_open')
-        current_price = sd.get('last_tick')
-        current_ltf = sd.get('current_ltf_candle')
-
-        if htf_open is None or current_price is None or current_ltf is None: return
-
-        for cid, c in self.bot.contracts.items():
-            if c['symbol'] == symbol: return
-
-        rsi_m3 = 50
-        if len(sd.get('m3_candles', [])) >= 14:
-            df_m3 = pd.DataFrame(sd['m3_candles'])
-            rsi_m3 = ta.momentum.RSIIndicator(df_m3['close']).rsi().iloc[-1]
-
-        bias = None
-        if len(sd.get('h4_candles', [])) >= 50:
-            df_h4 = pd.DataFrame(sd['h4_candles'])
-            ema21_h4 = ta.trend.EMAIndicator(df_h4['close'], window=21).ema_indicator().iloc[-1]
-            ema50_h4 = ta.trend.EMAIndicator(df_h4['close'], window=50).ema_indicator().iloc[-1]
-            bias = 'buy' if ema21_h4 > ema50_h4 else 'sell'
-
-        signal = None
-        if current_ltf['open'] <= htf_open and current_price > htf_open and current_price > current_ltf['open']:
-            if rsi_m3 > 55 and (bias is None or bias == 'buy'): signal = 'buy'
-        elif current_ltf['open'] >= htf_open and current_price < htf_open and current_price < current_ltf['open']:
-            if rsi_m3 < 45 and (bias is None or bias == 'sell'): signal = 'sell'
-
-        if signal:
-            self.bot.log(f"Strategy 2 triggered {signal} for {symbol}")
-            self.bot._execute_trade(symbol, signal)
+        self._generic_crossover_strategy(symbol, is_candle_close, 2, "3m", 3600)
 
     def _process_strategy_3(self, symbol, is_candle_close):
+        self._generic_crossover_strategy(symbol, is_candle_close, 3, "1m", 900)
+
+    def _generic_crossover_strategy(self, symbol, is_candle_close, strat_num, ta_interval, expiry_interval_sec):
         sd = self.bot.symbol_data[symbol]
         htf_open = sd.get('htf_open')
         current_price = sd.get('last_tick')
-        current_ltf = sd.get('current_ltf_candle')
+        last_price = self.last_prices.get(symbol)
 
-        if htf_open is None or current_price is None or current_ltf is None: return
+        if htf_open is None or current_price is None: return
 
+        # Only entry if not in position
         for cid, c in self.bot.contracts.items():
             if c['symbol'] == symbol: return
 
-        now = datetime.now(timezone.utc)
-        if sd.get('last_trade_hour') != now.hour:
-            sd['last_trade_hour'] = now.hour
-            sd['hourly_trade_count'] = 0
+        ta_signal = get_ta_signal(symbol, ta_interval)
+        entry_type = self.bot.config.get('entry_type', 'candle_close')
 
-        if sd.get('hourly_trade_count', 0) >= 4: return
+        # Crossover detection
+        is_cross_up = False
+        is_cross_down = False
 
+        if is_candle_close:
+            # Check if previous candle closed across
+            if len(sd.get('ltf_candles', [])) >= 1:
+                last_candle = sd['ltf_candles'][-1]
+                prev_candle = sd['ltf_candles'][-2] if len(sd['ltf_candles']) >= 2 else last_candle
+                if prev_candle['close'] <= htf_open and last_candle['close'] > htf_open:
+                    is_cross_up = True
+                elif prev_candle['close'] >= htf_open and last_candle['close'] < htf_open:
+                    is_cross_down = True
+        else:
+            # Tick mode crossover
+            if last_price is not None:
+                if last_price <= htf_open and current_price > htf_open:
+                    is_cross_up = True
+                elif last_price >= htf_open and current_price < htf_open:
+                    is_cross_down = True
+
+        # Signal Filtering
         signal = None
-        if current_ltf['open'] <= htf_open and current_price > htf_open:
-            signal = 'buy'
-        elif current_ltf['open'] >= htf_open and current_price < htf_open:
-            signal = 'sell'
+        if is_cross_up:
+            if ta_signal == "BUY" or (ta_signal == "STRONG_BUY" and is_candle_close):
+                signal = 'buy'
+        elif is_cross_down:
+            if ta_signal == "SELL" or (ta_signal == "STRONG_SELL" and is_candle_close):
+                signal = 'sell'
 
         if signal:
-            self.bot.log(f"Strategy 3 triggered {signal} for {symbol}")
+            self.bot.log(f"Strategy {strat_num} triggered {signal} for {symbol}. TA: {ta_signal}.")
             self.bot._execute_trade(symbol, signal)
 
     def _process_strategy_4(self, symbol, is_candle_close):
