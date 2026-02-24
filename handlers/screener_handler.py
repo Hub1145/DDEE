@@ -144,10 +144,11 @@ class ScreenerHandler:
 
                 fcast_data = {
                     'high': fcast_high, 'low': fcast_low, 'final': fcast_final,
-                    'correlation': correlation
+                    'correlation': correlation,
+                    'forecast_prices': fcast_prices
                 }
 
-            expiry = predict_expiry_v5(symbol, 'strategy_5', 1, 60, confidence, fcast_data, df1m)
+            expiry = predict_expiry_v5(symbol, 'strategy_5', 1, 60, confidence, fcast_data, df1m, direction=direction)
 
             atr_1m = 0
             if not df1m.empty:
@@ -215,10 +216,11 @@ class ScreenerHandler:
 
                 fcast_data = {
                     'high': max(fcast_prices), 'low': min(fcast_prices),
-                    'final': fcast_final, 'correlation': correlation
+                    'final': fcast_final, 'correlation': correlation,
+                    'forecast_prices': fcast_prices
                 }
 
-            expiry = predict_expiry_v5(symbol, 'strategy_6', 1, 15, confidence, fcast_data, df1m)
+            expiry = predict_expiry_v5(symbol, 'strategy_6', 1, 15, confidence, fcast_data, df1m, direction=direction)
 
             atr_1m = 0
             if not df1m.empty:
@@ -333,11 +335,12 @@ class ScreenerHandler:
 
                 fcast_data.update({
                     'high': max(fcast_prices), 'low': min(fcast_prices),
-                    'final': fcast_final, 'correlation': correlation
+                    'final': fcast_final, 'correlation': correlation,
+                    'forecast_prices': fcast_prices
                 })
 
             df_ltf = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, s_tf or "1m"), manager.loop).result()
-            expiry = predict_expiry_v5(symbol, 'strategy_7', 1, 60, confidence, fcast_data, df_ltf)
+            expiry = predict_expiry_v5(symbol, 'strategy_7', 1, 60, confidence, fcast_data, df_ltf, direction=direction)
 
             atr_val = 0
             if not df_ref.empty:

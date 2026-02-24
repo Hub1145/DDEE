@@ -254,47 +254,64 @@ def get_smart_multiplier(atr_pct, base_multiplier=100):
     # Constrain to sensible limits (e.g. 10x to 500x)
     return int(max(10, min(500, multiplier)))
 
-def predict_expiry_v5(symbol, strategy_key, ltf_min, htf_min, confidence, fcast_data, df_ltf):
+def predict_expiry_v5(symbol, strategy_key, ltf_min, htf_min, confidence, fcast_data, df_ltf, direction='NEUTRAL'):
     """
-    Expert Intelligence Expiry Engine (Enhanced with Echo Forecast).
-    Predicts optimal duration based on ATR velocity, Confidence, and Historical Fractal Echoes.
+    Expert Intelligence Expiry Engine (v5.1 Enhanced with Echo Arrival Logic).
+    Predicts optimal duration based on the confidence that price will reach an ATR target
+    within the forecasted structural window.
     """
     # 1. Base Intelligence from ATR Speed
     atr = 0
+    curr_price = 0
     if df_ltf is not None and not df_ltf.empty:
         atr_series = ta.volatility.average_true_range(df_ltf['high'], df_ltf['low'], df_ltf['close'], window=14)
         atr = atr_series.iloc[-1]
+        curr_price = df_ltf['close'].iloc[-1]
 
     base_expiry = 5
     if ltf_min: base_expiry = ltf_min * 3
 
-    # 2. Echo Forecast Intelligence (LuxAlgo-inspired)
-    # If we have a high-correlation echo, we use its structure to suspect expiry.
-    if fcast_data and 'correlation' in fcast_data and fcast_data['correlation'] > 0.5:
-        correlation = fcast_data['correlation']
-        # We look at the projected range. If projected price reaches 1x ATR distance,
-        # we set expiry to that suspicion point.
-        curr_price = df_ltf['close'].iloc[-1] if df_ltf is not None else 0
-        target_move = atr * 1.0
+    # 2. Echo Forecast Arrival Logic (v5.1)
+    # We look for the exact candle where the forecast reaches our "Success Zone"
+    if fcast_data and 'forecast_prices' in fcast_data and fcast_data.get('correlation', 0) > 0.5:
+        prices = fcast_data['forecast_prices']
 
-        # For simplicity, we assume linear progression if we don't have individual fcast prices here
-        # But we can use the 'final' projected price to suspect velocity.
-        projected_total_move = abs(fcast_data.get('final', curr_price) - curr_price)
+        # Define the target price point we are confident in reaching
+        # High confidence -> reach further targets. Low confidence -> reach closer targets.
+        target_dist = atr * (0.5 + (confidence / 100))
 
-        if projected_total_move > 0:
-            # How many candles to reach target move?
-            # Suspected candles = (Target Move / Projected Move) * Forecast Window (50)
-            # Scaled by confidence
-            suspected_candles = (target_move / projected_total_move) * 50
-            suspected_candles = suspected_candles * (1.2 - (confidence/100)) # High confidence = faster
+        arrival_index = -1
+        if direction in ['CALL', 'BUY']:
+            target_price = curr_price + target_dist
+            for idx, p in enumerate(prices):
+                if p >= target_price:
+                    arrival_index = idx + 1
+                    break
+        elif direction in ['PUT', 'SELL']:
+            target_price = curr_price - target_dist
+            for idx, p in enumerate(prices):
+                if p <= target_price:
+                    arrival_index = idx + 1
+                    break
 
-            base_expiry = max(1, min(fcast_data.get('window', 50), int(suspected_candles)))
-
-            # Convert to minutes if needed
+        if arrival_index != -1:
+            base_expiry = arrival_index
             if strategy_key in ['strategy_5', 'strategy_6']:
                 base_expiry = base_expiry * (ltf_min or 1)
+            return max(1, base_expiry)
+        else:
+            # If target not reached in forecast, find the most extreme point index
+            try:
+                if direction in ['CALL', 'BUY']:
+                    base_expiry = prices.index(max(prices)) + 1
+                elif direction in ['PUT', 'SELL']:
+                    base_expiry = prices.index(min(prices)) + 1
+            except:
+                pass
 
-        return max(1, base_expiry)
+            if strategy_key in ['strategy_5', 'strategy_6']:
+                base_expiry = base_expiry * (ltf_min or 1)
+            return max(1, base_expiry)
 
     # 3. Fallback Strategy-Specific Logic
     if strategy_key in ['strategy_5', 'strategy_6']:
