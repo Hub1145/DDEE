@@ -23,7 +23,7 @@
   "contract_type": "rise_fall",
   "multiplier_value": "100",
   "custom_expiry": "default",
-  "strat7_small_tf": "60",
+  "strat7_small_tf": "OFF",
   "strat7_mid_tf": "300",
   "strat7_high_tf": "3600"
 }

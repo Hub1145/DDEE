@@ -245,25 +245,31 @@ function updateScreenerTable(symbol, data) {
     const dynamicCols = document.querySelectorAll('.screener-dynamic-col');
     const recHeader = document.getElementById('screenerRecHeader');
 
+    const isSmallOff = activeStrategy === 'strategy_7' && currentConfig && currentConfig.strat7_small_tf === 'OFF';
+    const isMidOff = activeStrategy === 'strategy_7' && currentConfig && currentConfig.strat7_mid_tf === 'OFF';
+    const isHighOff = activeStrategy === 'strategy_7' && currentConfig && currentConfig.strat7_high_tf === 'OFF';
+
     if (activeStrategy === 'strategy_7') {
         if (recHeader) recHeader.textContent = "ATR (Mid TF)";
         if (dynamicCols.length >= 4) {
-            dynamicCols[0].textContent = "Small TF";
-            dynamicCols[1].textContent = "Mid TF";
-            dynamicCols[2].textContent = "High TF";
-            dynamicCols[3].textContent = "Alignment";
+            const tfMap = { "60": "1m", "120": "2m", "180": "3m", "300": "5m", "900": "15m", "1800": "30m", "3600": "1h", "7200": "2h", "14400": "4h", "86400": "1d" };
 
-            // Update column titles if custom TFs are used
-            if (currentConfig) {
-                const tfMap = { "60": "1m", "120": "2m", "180": "3m", "300": "5m", "900": "15m", "1800": "30m", "3600": "1h", "7200": "2h", "14400": "4h", "86400": "1d" };
-                dynamicCols[0].textContent = `Small (${tfMap[currentConfig.strat7_small_tf] || '1m'})`;
-                dynamicCols[1].textContent = `Mid (${tfMap[currentConfig.strat7_mid_tf] || '5m'})`;
-                dynamicCols[2].textContent = `High (${tfMap[currentConfig.strat7_high_tf] || '1h'})`;
-            }
+            dynamicCols[0].textContent = `Small (${tfMap[currentConfig?.strat7_small_tf] || '1m'})`;
+            dynamicCols[0].style.display = isSmallOff ? 'none' : '';
+
+            dynamicCols[1].textContent = `Mid (${tfMap[currentConfig?.strat7_mid_tf] || '5m'})`;
+            dynamicCols[1].style.display = isMidOff ? 'none' : '';
+
+            dynamicCols[2].textContent = `High (${tfMap[currentConfig?.strat7_high_tf] || '1h'})`;
+            dynamicCols[2].style.display = isHighOff ? 'none' : '';
+
+            dynamicCols[3].textContent = "Alignment";
+            dynamicCols[3].style.display = '';
         }
     } else {
         if (recHeader) recHeader.textContent = "Recommendation";
         if (dynamicCols.length >= 4) {
+            dynamicCols.forEach(col => col.style.display = '');
             dynamicCols[0].textContent = "Trend";
             dynamicCols[1].textContent = "Momentum";
             dynamicCols[2].textContent = "Volatility";
@@ -312,9 +318,9 @@ function updateScreenerTable(symbol, data) {
                 <td class="${confColor} fw-bold">${displayConf} <small class="text-muted">/${threshold}%</small></td>
                 <td class="${dirColor} fw-bold">${d.direction}</td>
                 <td><small>${recValue}</small></td>
-                <td>${col1}</td>
-                <td>${col2}</td>
-                <td>${col3}</td>
+                <td style="${isSmallOff ? 'display:none' : ''}">${col1}</td>
+                <td style="${isMidOff ? 'display:none' : ''}">${col2}</td>
+                <td style="${isHighOff ? 'display:none' : ''}">${col3}</td>
                 <td>${col4}</td>
             </tr>
         `;
