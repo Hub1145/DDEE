@@ -188,15 +188,25 @@ class ConnectionManager:
                 await asyncio.sleep(5)
 
     async def call(self, request: dict):
-        req_id = str(time.time_ns())
-        request['passthrough'] = {'req_id': req_id}
-        future = self.loop.create_future()
-        self.requests[req_id] = future
-        try:
-            await self.ws.send(json.dumps(request))
-            return await asyncio.wait_for(future, timeout=10)
-        finally:
-            del self.requests[req_id]
+        # Retry mechanism for connection hiccups
+        for attempt in range(3):
+            if not self.ws or not self.ws.open:
+                await asyncio.sleep(1)
+                continue
+
+            req_id = str(time.time_ns())
+            request['passthrough'] = {'req_id': req_id}
+            future = self.loop.create_future()
+            self.requests[req_id] = future
+            try:
+                await self.ws.send(json.dumps(request))
+                return await asyncio.wait_for(future, timeout=10)
+            except (asyncio.TimeoutError, websockets.ConnectionClosed):
+                if attempt == 2: raise
+                await asyncio.sleep(1)
+            finally:
+                self.requests.pop(req_id, None)
+        return {}
 
 manager = ConnectionManager()
 manager.start()
