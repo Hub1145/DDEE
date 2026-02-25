@@ -276,7 +276,7 @@
                 <div class="card p-3">
                     <div class="section-title">
                         <span>Units</span>
-                        <span class="text-accent small" id="displaySymbol">LONG 0.0000000 LINKUSDC <i class="bi bi-question-circle"></i></span>
+                        <span class="text-accent small" id="displaySymbol"><i class="bi bi-file-earmark-text"></i> LONG 0.0000000 LINKUSDC <i class="bi bi-question-circle"></i></span>
                     </div>
                     <div class="mb-3">
                         <div class="d-flex justify-content-between mb-1">
@@ -300,11 +300,14 @@
                             <option value="ISOLATED">Isolated</option>
                         </select>
                         <div class="mb-2 small text-muted">Leverage custom value</div>
-                        <div class="position-relative px-2">
-                            <input type="range" class="leverage-slider" min="1" max="125" value="20" id="inputLeverage">
-                            <div class="leverage-marks">
-                                <span>1x</span><span>2x</span><span>3x</span><span>5x</span><span>25x</span><span>50x</span><span>75x</span>
+                        <div class="position-relative px-2 d-flex align-items-center">
+                            <div class="flex-grow-1">
+                                <input type="range" class="leverage-slider" min="1" max="125" value="20" id="inputLeverage">
+                                <div class="leverage-marks">
+                                    <span>1x</span><span>2x</span><span>3x</span><span>5x</span><span>25x</span><span>50x</span><span>75x</span>
+                                </div>
                             </div>
+                            <i class="bi bi-keyboard ms-2 text-muted" style="cursor: pointer;"></i>
                         </div>
                         <div class="mt-2 small text-muted">Margin: 10 LINKUSDC | 85.65 USDC</div>
                     </div>
@@ -389,7 +392,9 @@
                         </div>
                     </div>
                     <div class="small">Approximate Profit:</div>
-                    <div class="fw-bold text-danger">-$1712.89 -100% (ROE: -2,000%)</div>
+                    <div class="fw-bold text-danger small">
+                        <i class="bi bi-currency-dollar border border-primary rounded-circle p-1" style="font-size: 0.7rem;"></i> -$1712.89079 -$1,712.89 -100% (ROE: -2,000%)
+                    </div>
                 </div>
             </div>
 
