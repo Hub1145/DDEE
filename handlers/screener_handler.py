@@ -39,6 +39,13 @@ class ScreenerHandler:
             logging.error(f"Screener error for {symbol}: {e}")
             return None
 
+    def _get_htf_countdown(self, granularity_sec):
+        """Calculates seconds remaining until the next candle boundary."""
+        now = time.time()
+        if granularity_sec <= 0: return 60
+        next_boundary = ((int(now) // granularity_sec) + 1) * granularity_sec
+        return int(next_boundary - now)
+
     def _get_smart_expiry(self, df_ltf, ltf_min, htf_min):
         try:
             if df_ltf is None or len(df_ltf) < 20:
@@ -168,6 +175,13 @@ class ScreenerHandler:
                 if f_low.iloc[-1]: struct_score += 15
                 elif f_high.iloc[-1]: struct_score -= 15
 
+            # Normalization and Confidence (Weights: Trend 40%, Momentum 30%, Vol 10%, Struct 20%)
+            # We map scores to a 0.0 - 10.0 range for the UI
+            norm_trend = 5.0 + (trend_score / 8.0) # trend_score is +/- 40 max
+            norm_mom = 5.0 + (mom_score / 7.0)   # mom_score is +/- 35 max
+            norm_vol = 5.0 + (vol_score)        # vol_score is +/- 5 max
+            norm_struct = 5.0 + (struct_score / 4.0) # struct_score is +/- 20 max
+
             # Total Confidence Calculation
             total_raw = trend_score + mom_score + vol_score + struct_score
             confidence = min(100, abs(total_raw))
@@ -199,16 +213,18 @@ class ScreenerHandler:
                 fcast_data = {
                     'final': fcast_final, 'correlation': correlation,
                     'forecast_prices': fcast_prices,
-                    'high': max(fcast_prices), 'low': min(fcast_prices)
+                    'high': max(fcast_prices), 'low': min(fcast_prices),
+                    'direction': "CALL" if fcast_final > df5m['close'].iloc[-1] else "PUT"
                 }
 
             atr_val = ta.volatility.AverageTrueRange(df5m['high'], df5m['low'], df5m['close']).average_true_range().iloc[-1]
             expiry = predict_expiry_v5(symbol, 'strategy_5', 1, 60, confidence, fcast_data, df1m, direction=direction)
 
             tp_price, sl_price, rr = None, None, 0
-            if signal != "WAIT":
-                tp_price, sl_price = get_smart_targets(df1m['close'].iloc[-1], 'long' if signal == "BUY" else 'short', atr_val, confidence, fcast_data)
-                rr = calculate_structural_rr(df1m['close'].iloc[-1], fcast_prices, signal, atr_val)
+            # Always calculate targets for screener if possible
+            tp_price, sl_price = get_smart_targets(df1m['close'].iloc[-1], 'long' if total_raw > 0 else 'short', atr_val, confidence, fcast_data)
+            if fcast_prices:
+                rr = calculate_structural_rr(df1m['close'].iloc[-1], fcast_prices, "BUY" if total_raw > 0 else "SELL", atr_val)
 
             data = {
                 'tp': round(tp_price, 4) if tp_price else None,
@@ -219,8 +235,10 @@ class ScreenerHandler:
                 'confidence': round(float(confidence), 1),
                 'threshold': threshold,
                 'expiry_min': expiry,
+                'expiry_countdown': expiry * 60,
                 'atr': round(atr_val, 4),
-                'trend': trend_score, 'momentum': mom_score, 'volatility': vol_score, 'structure': struct_score,
+                'trend': round(norm_trend, 1), 'momentum': round(norm_mom, 1),
+                'volatility': round(norm_vol, 1), 'structure': round(norm_struct, 1),
                 'fcast_data': fcast_data,
                 'last_update': time.time()
             }
@@ -277,7 +295,7 @@ class ScreenerHandler:
             elif macd_div == -1: struct_score -= 1
             struct_final = struct_score * 2
 
-            # Normalize confidence (max possible absolute score is 3*3 + 2*2 + 1*1 + 1*2 = 9 + 4 + 1 + 2 = 16)
+            # Normalize confidence (max possible absolute score is 3*3 + 2*2 + 1*1 + 1*2 = 16)
             total_score = trend_final + mom_final + vol_final + struct_final
             confidence = min(100, abs(total_score) / 16 * 100)
 
@@ -285,6 +303,12 @@ class ScreenerHandler:
             signal = "WAIT"
             if confidence >= 60:
                 signal = "BUY" if total_score > 0 else "SELL"
+
+            # Normalize scores for UI (0-10)
+            norm_trend = 5.0 + (trend_score * 1.6) # +/- 3 * 1.6 = +/- 4.8
+            norm_mom = 5.0 + (mom_score * 2.5)   # +/- 2 * 2.5 = +/- 5.0
+            norm_vol = 5.0 + (vol_score * 5.0)   # +/- 1 * 5.0 = +/- 5.0
+            norm_struct = 5.0 + (struct_score * 5.0) # +/- 1 * 5.0 = +/- 5.0
 
             # Echo Forecast validation
             fcast_prices, correlation = calculate_echo_forecast(df1h)
@@ -295,15 +319,18 @@ class ScreenerHandler:
                     signal = "WAIT"
                 elif signal == "SELL" and fcast_final >= df1h['close'].iloc[-1]:
                     signal = "WAIT"
-                fcast_data = {'final': fcast_final, 'correlation': correlation, 'forecast_prices': fcast_prices}
+                fcast_data = {
+                    'final': fcast_final, 'correlation': correlation, 'forecast_prices': fcast_prices,
+                    'direction': "CALL" if fcast_final > df1h['close'].iloc[-1] else "PUT"
+                }
 
             atr_val = ta.volatility.AverageTrueRange(df1h['high'], df1h['low'], df1h['close']).average_true_range().iloc[-1]
             expiry = predict_expiry_v5(symbol, 'strategy_6', 1, 15, confidence, fcast_data, df1m, direction=direction)
 
             tp_price, sl_price, rr = None, None, 0
-            if signal != "WAIT":
-                tp_price, sl_price = get_smart_targets(df1m['close'].iloc[-1], 'long' if signal == "BUY" else 'short', atr_val, confidence, fcast_data)
-                rr = calculate_structural_rr(df1m['close'].iloc[-1], fcast_prices, signal, atr_val)
+            tp_price, sl_price = get_smart_targets(df1m['close'].iloc[-1], 'long' if total_score > 0 else 'short', atr_val, confidence, fcast_data)
+            if fcast_prices:
+                rr = calculate_structural_rr(df1m['close'].iloc[-1], fcast_prices, "BUY" if total_score > 0 else "SELL", atr_val)
 
             data = {
                 'tp': round(tp_price, 4) if tp_price else None,
@@ -314,8 +341,10 @@ class ScreenerHandler:
                 'confidence': round(float(confidence), 1),
                 'threshold': 60,
                 'expiry_min': expiry,
+                'expiry_countdown': expiry * 60,
                 'atr': round(atr_val, 4),
-                'trend': trend_final, 'momentum': mom_final, 'volatility': vol_final, 'structure': struct_final,
+                'trend': round(norm_trend, 1), 'momentum': round(norm_mom, 1),
+                'volatility': round(norm_vol, 1), 'structure': round(norm_struct, 1),
                 'fcast_data': fcast_data,
                 'last_update': time.time()
             }
@@ -419,6 +448,13 @@ class ScreenerHandler:
             df_ltf = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, s_tf or "1m"), manager.loop).result()
             expiry = predict_expiry_v5(symbol, 'strategy_7', 1, 60, confidence, fcast_data, df_ltf, direction=direction)
 
+            # Strategy 7 HTF Countdown
+            htf_sec = 3600
+            if tf_high_str != 'OFF': htf_sec = int(tf_high_str)
+            elif tf_mid_str != 'OFF': htf_sec = int(tf_mid_str)
+
+            countdown = self._get_htf_countdown(htf_sec)
+
             atr_val = 0
             tp_price, sl_price, rr = None, None, 0
             if not df_ref.empty:
@@ -441,6 +477,7 @@ class ScreenerHandler:
                 'summary_mid': rec_mid,
                 'summary_high': rec_high,
                 'expiry_min': expiry,
+                'expiry_countdown': countdown,
                 'atr': round(atr_val, 4),
                 'trend': trend, 'momentum': momentum, 'volatility': volatility, 'structure': structure,
                 'fcast_data': fcast_data,
@@ -473,6 +510,8 @@ class ScreenerHandler:
             }
             expiry = predict_expiry_v5(symbol, 'strategy_4', 1, 5, confidence, fcast_data, df1m, direction=echo_dir)
 
+            atr_val = ta.volatility.AverageTrueRange(df1m['high'], df1m['low'], df1m['close']).average_true_range().iloc[-1] if not df1m.empty else 0
+
             data = {
                 'signal': "WAIT",
                 'direction': echo_dir,
@@ -480,6 +519,8 @@ class ScreenerHandler:
                 'confidence': round(float(confidence), 1),
                 'threshold': 50,
                 'expiry_min': expiry,
+                'expiry_countdown': expiry * 60,
+                'atr': round(atr_val, 4),
                 'trend_rec': echo_dir,
                 'fcast_data': fcast_data,
                 'last_update': time.time()
@@ -508,24 +549,40 @@ class ScreenerHandler:
         fcast_prices, correlation = calculate_echo_forecast(df_ltf)
 
         echo_conf = "WAIT"
+        fcast_data = {}
         if fcast_prices:
             fcast_final = fcast_prices[-1]
             if direction == "CALL" and fcast_final > price: echo_conf = "Confirmed UP"
             elif direction == "PUT" and fcast_final < price: echo_conf = "Confirmed DOWN"
             else: echo_conf = "Not Confirmed"
+            fcast_data = {
+                'final': fcast_final, 'correlation': correlation, 'forecast_prices': fcast_prices,
+                'direction': "CALL" if fcast_final > price else "PUT"
+            }
+
+        atr_val = ta.volatility.AverageTrueRange(df_ltf['high'], df_ltf['low'], df_ltf['close']).average_true_range().iloc[-1] if not df_ltf.empty else 0
+        countdown = self._get_htf_countdown(htf_sec)
+
+        tp_price, sl_price, rr = None, None, 0
+        if price > 0:
+            tp_price, sl_price = get_smart_targets(price, 'long' if direction == "CALL" else 'short', atr_val, correlation*100, fcast_data)
+            if fcast_prices:
+                rr = calculate_structural_rr(price, fcast_prices, "BUY" if direction == "CALL" else "SELL", atr_val)
 
         data = {
+            'tp': round(tp_price, 4) if tp_price else None,
+            'sl': round(sl_price, 4) if sl_price else None,
+            'rr': round(float(rr), 1),
             'signal': ta_signal,
             'direction': direction,
-            'desc': f"HTF Open: {htf_open} | Echo: {echo_conf} ({correlation:.2f})",
+            'desc': f"HTF Open: {htf_open} | Echo: {echo_conf}",
             'confidence': round(float(correlation * 100), 1),
             'threshold': 0,
-            'expiry_min': htf_sec // 60,
+            'expiry_min': countdown // 60,
+            'expiry_countdown': countdown,
+            'atr': round(atr_val, 4),
             'trend_rec': ta_signal,
-            'fcast_data': {
-                'forecast_prices': fcast_prices,
-                'correlation': correlation
-            },
+            'fcast_data': fcast_data,
             'last_update': time.time()
         }
         self.bot.screener_data[symbol] = data

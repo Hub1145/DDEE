@@ -57,7 +57,7 @@ class StrategyHandler:
 
         # Strategy 5, 6, 7 rely on Screener Data
         if strat_key in ['strategy_5', 'strategy_6', 'strategy_7']:
-            self._process_screener_based_strategy(symbol, strat_key)
+            self._process_screener_based_strategy(symbol, strat_key, is_candle_close)
         elif strat_key == 'strategy_1':
             self._process_strategy_1(symbol, is_candle_close)
         elif strat_key == 'strategy_2':
@@ -69,7 +69,14 @@ class StrategyHandler:
 
         self.last_prices[symbol] = current_price
 
-    def _process_screener_based_strategy(self, symbol, strat_key):
+    def _process_screener_based_strategy(self, symbol, strat_key, is_candle_close):
+        # 1. Respect Entry Type
+        entry_type = self.bot.config.get('entry_type', 'candle_close')
+        if entry_type == 'candle_close' and not is_candle_close:
+            return
+        if entry_type == 'tick' and is_candle_close:
+            return
+
         data = self.bot.screener_data.get(symbol)
         if not data: return
 
@@ -102,8 +109,12 @@ class StrategyHandler:
 
             # 1. Echo Confirmation: Forecast must agree with signal direction
             if signal == 'BUY' and proj_price <= last_price:
+                if strat_key == 'strategy_7':
+                    self.bot.log(f"Strategy 7 signal BUY for {symbol} rejected: Echo forecast bearish or flat ({proj_price:.4f} <= {last_price:.4f})")
                 return
             if signal == 'SELL' and proj_price >= last_price:
+                if strat_key == 'strategy_7':
+                    self.bot.log(f"Strategy 7 signal SELL for {symbol} rejected: Echo forecast bullish or flat ({proj_price:.4f} >= {last_price:.4f})")
                 return
 
             # 2. Structural RR Gatekeeper (Using ATR as risk floor)
@@ -111,6 +122,8 @@ class StrategyHandler:
             rr = calculate_structural_rr(last_price, fcast_data['forecast_prices'], signal, atr)
             if rr < 1.5:
                 # If RR is low, wait for a pullback or better setup
+                if strat_key == 'strategy_7':
+                    self.bot.log(f"Strategy 7 signal {signal} for {symbol} rejected: Structural RR too low ({rr:.2f} < 1.5)")
                 return
 
         # Check if already in position for this symbol
@@ -134,6 +147,13 @@ class StrategyHandler:
         self._generic_crossover_strategy(symbol, is_candle_close, 3, "1m", 900)
 
     def _generic_crossover_strategy(self, symbol, is_candle_close, strat_num, ta_interval, expiry_interval_sec):
+        # Respect Entry Type
+        entry_type = self.bot.config.get('entry_type', 'candle_close')
+        if entry_type == 'candle_close' and not is_candle_close:
+            return
+        if entry_type == 'tick' and is_candle_close:
+            return
+
         sd = self.bot.symbol_data[symbol]
         htf_open = sd.get('htf_open')
         current_price = sd.get('last_tick')
@@ -146,7 +166,6 @@ class StrategyHandler:
             if c['symbol'] == symbol: return
 
         ta_signal = get_ta_signal(symbol, ta_interval)
-        entry_type = self.bot.config.get('entry_type', 'candle_close')
 
         # Crossover detection
         is_cross_up = False
@@ -210,10 +229,28 @@ class StrategyHandler:
                 msg += " (Note: Potential exhaustion risk with STRONG signal)"
 
             self.bot.log(msg)
-            self.bot._execute_trade(symbol, signal)
+
+            # Use dynamic HTF countdown as expiry
+            now = time.time()
+            next_boundary = ((int(now) // expiry_interval_sec) + 1) * expiry_interval_sec
+            remaining = int(next_boundary - now)
+
+            metadata = {
+                'expiry_min': max(1, remaining // 60),
+                'expiry_seconds': remaining
+            }
+
+            self.bot._execute_trade(symbol, signal, metadata=metadata)
 
     def _process_strategy_4(self, symbol, is_candle_close):
         """Strategy 4: 5m SNR + 1m Reversal (Rise & Fall Only)"""
+        # Respect Entry Type
+        entry_type = self.bot.config.get('entry_type', 'candle_close')
+        if entry_type == 'candle_close' and not is_candle_close:
+            return
+        if entry_type == 'tick' and is_candle_close:
+            return
+
         sd = self.bot.symbol_data[symbol]
         current_price = sd.get('last_tick')
         if current_price is None: return

@@ -839,7 +839,7 @@ class TradingBotEngine:
             duration_seconds = 300
             expiry_label = "Expiry: 5 minutes (Constant)"
 
-        elif strat_key in ['strategy_5', 'strategy_6', 'strategy_7']:
+        elif strat_key in ['strategy_1', 'strategy_2', 'strategy_3', 'strategy_5', 'strategy_6', 'strategy_7']:
             metrics = metadata or self.screener_data.get(symbol, {})
             contract_type = self.config.get('contract_type', 'rise_fall')
             is_multiplier = (contract_type == 'multiplier')
@@ -863,10 +863,14 @@ class TradingBotEngine:
                         self.log(f"Strategy 5 Scalp PAUSED: Volatility too low (ATR: {atr_1m})")
                         return
 
-                # Dynamic expiry based on trigger timeframe
-                duration_minutes = metrics.get('expiry_min', 5)
-                duration_seconds = duration_minutes * 60
-                expiry_label = f"Smart Expiry: {duration_minutes}m"
+                # Dynamic expiry based on trigger timeframe or HTF countdown
+                if metrics.get('expiry_seconds'):
+                    duration_seconds = metrics['expiry_seconds']
+                else:
+                    duration_minutes = metrics.get('expiry_min', 5)
+                    duration_seconds = duration_minutes * 60
+
+                expiry_label = f"Smart Expiry: {duration_seconds // 60}m {duration_seconds % 60}s"
             else:
                 expiry_label = "Multiplier Position"
         elif strat['expiry_type'] == 'eod':
@@ -1016,7 +1020,8 @@ class TradingBotEngine:
             sl_usd = abs((sl_price - entry_price) / entry_price) * mult_val * amount if entry_price and sl_price else 0.1 * amount
             tp_usd = abs((tp_price - entry_price) / entry_price) * mult_val * amount if entry_price and tp_price else 0.2 * amount
 
-            self.log(f"Opening MULTIPLIER {side.upper()} on {symbol} | Stake: {amount} | Tiered Mult: {mult_val}x | Confidence: {confidence}%")
+            multiplier_side = "BUY" if side == 'buy' else "SELL"
+            self.log(f"Opening MULTIPLIER {multiplier_side} on {symbol} | Stake: {amount} | Tiered Mult: {mult_val}x | Confidence: {confidence}%")
 
             buy_request = {
                 "buy": 1,
@@ -1263,9 +1268,16 @@ class TradingBotEngine:
         self.open_trades = []
         floating_pnl = 0.0
         used_notional = 0.0
+        contract_type = self.config.get('contract_type', 'rise_fall')
+        is_multiplier = (contract_type == 'multiplier')
+
         for cid, c in self.contracts.items():
+            display_type = c['side'].capitalize() # 'Long' or 'Short'
+            if is_multiplier:
+                display_type = 'BUY' if c['side'] == 'long' else 'SELL'
+
             self.open_trades.append({
-                'id': cid, 'type': c['side'].capitalize(), 'symbol': c['symbol'],
+                'id': cid, 'type': display_type, 'symbol': c['symbol'],
                 'entry_spot_price': c['entry_price'], 'stake': c['stake'], 'pnl': c['pnl'],
                 'expiry_time': c['expiry_time'],
                 'status': c.get('status', 'Holding'),

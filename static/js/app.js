@@ -246,7 +246,6 @@ function updateScreenerTable(symbol, data) {
 
     // Update Headers based on Active Strategy
     const dynamicCols = document.querySelectorAll('.screener-dynamic-col');
-    const recHeader = document.getElementById('screenerRecHeader');
 
     const isStrat123 = ['strategy_1', 'strategy_2', 'strategy_3'].includes(activeStrategy);
     const isSmallOff = activeStrategy === 'strategy_7' && currentConfig && currentConfig.strat7_small_tf === 'OFF';
@@ -254,24 +253,20 @@ function updateScreenerTable(symbol, data) {
     const isHighOff = (activeStrategy === 'strategy_7' && currentConfig && currentConfig.strat7_high_tf === 'OFF') || isStrat123;
 
     if (activeStrategy === 'strategy_7') {
-        if (recHeader) recHeader.textContent = "Expiry | ATR";
         if (dynamicCols.length >= 4) {
             const tfMap = { "60": "1m", "120": "2m", "180": "3m", "300": "5m", "900": "15m", "1800": "30m", "3600": "1h", "7200": "2h", "14400": "4h", "86400": "1d" };
-
             dynamicCols[0].textContent = `Small (${tfMap[currentConfig?.strat7_small_tf] || '1m'})`;
-            dynamicCols[0].style.display = isSmallOff ? 'none' : '';
-
             dynamicCols[1].textContent = `Mid (${tfMap[currentConfig?.strat7_mid_tf] || '5m'})`;
-            dynamicCols[1].style.display = isMidOff ? 'none' : '';
-
             dynamicCols[2].textContent = `High (${tfMap[currentConfig?.strat7_high_tf] || '1h'})`;
-            dynamicCols[2].style.display = isHighOff ? 'none' : '';
-
             dynamicCols[3].textContent = "Alignment";
-            dynamicCols[3].style.display = '';
+            dynamicCols.forEach((col, idx) => {
+                if (idx === 0) col.style.display = isSmallOff ? 'none' : '';
+                else if (idx === 1) col.style.display = isMidOff ? 'none' : '';
+                else if (idx === 2) col.style.display = isHighOff ? 'none' : '';
+                else col.style.display = '';
+            });
         }
-    } else if (['strategy_1', 'strategy_2', 'strategy_3'].includes(activeStrategy)) {
-        if (recHeader) recHeader.textContent = "Expiry | ATR";
+    } else if (isStrat123) {
         if (dynamicCols.length >= 4) {
             dynamicCols[0].textContent = "TA Signal";
             dynamicCols[0].style.display = '';
@@ -281,13 +276,12 @@ function updateScreenerTable(symbol, data) {
             dynamicCols[3].style.display = '';
         }
     } else {
-        if (recHeader) recHeader.textContent = "Expiry | ATR";
         if (dynamicCols.length >= 4) {
             dynamicCols.forEach(col => col.style.display = '');
             dynamicCols[0].textContent = "Trend";
-            dynamicCols[1].textContent = "Momentum";
-            dynamicCols[2].textContent = "Volatility";
-            dynamicCols[3].textContent = "Structure";
+            dynamicCols[1].textContent = "Mom";
+            dynamicCols[2].textContent = "Vol";
+            dynamicCols[3].textContent = "Struct";
         }
     }
 
@@ -295,20 +289,31 @@ function updateScreenerTable(symbol, data) {
         const d = screenerDataMap[sym];
         const threshold = d.threshold || (currentConfig?.contract_type === 'multiplier' ? 68 : 72);
         const streak = d.streak || 0;
+        const isMultiplier = currentConfig?.contract_type === 'multiplier';
 
         const confColor = Math.abs(d.confidence) >= threshold ? 'text-success' : 'text-warning';
+
+        // Multiplier Terminology Swap
+        let directionLabel = d.direction;
+        if (isMultiplier) {
+            directionLabel = (d.direction === 'CALL' ? 'BUY' : 'SELL');
+        }
         const dirColor = d.direction === 'CALL' ? 'text-success' : 'text-danger';
 
-        const contractType = currentConfig ? currentConfig.contract_type : 'rise_fall';
         let recValue = "";
         let col1 = d.trend || 0;
         let col2 = d.momentum || 0;
         let col3 = d.volatility || 0;
         let col4 = d.structure || 0;
 
+        const now = Math.floor(Date.now() / 1000);
+        const expiryEpoch = now + (d.expiry_countdown || 0);
+        const countdownHtml = `<span class="screener-expiry-countdown text-warning" data-expiry="${expiryEpoch}">${formatCountdown(expiryEpoch)}</span>`;
+
         const sessionTag = d.is_dead_hours ? ' <span class="text-warning" title="Session Filter Active (22-06 UTC)">🌙</span>' : '';
+
         if (activeStrategy === 'strategy_7') {
-            recValue = `${d.expiry_min}m${sessionTag} | ${d.atr || "0.00"}`;
+            recValue = `${countdownHtml}${sessionTag} | ${d.atr || "0.00"}`;
             col1 = `<span class="badge ${d.summary_small?.includes('BUY') ? 'bg-success' : (d.summary_small?.includes('SELL') ? 'bg-danger' : 'bg-secondary')}">${d.summary_small || 'NEUTRAL'}</span>`;
             col2 = `<span class="badge ${d.summary_mid?.includes('BUY') ? 'bg-success' : (d.summary_mid?.includes('SELL') ? 'bg-danger' : 'bg-secondary')}">${d.summary_mid || 'NEUTRAL'}</span>`;
             col3 = `<span class="badge ${d.summary_high?.includes('BUY') ? 'bg-success' : (d.summary_high?.includes('SELL') ? 'bg-danger' : 'bg-secondary')}">${d.summary_high || 'NEUTRAL'}</span>`;
@@ -318,30 +323,45 @@ function updateScreenerTable(symbol, data) {
             const allSell = activeRecs.length > 0 && activeRecs.every(r => r.includes('SELL'));
             const aligned = allBuy || allSell;
             col4 = aligned ? '<span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Aligned</span>' : '<span class="text-muted">Mixed</span>';
-        } else if (['strategy_1', 'strategy_2', 'strategy_3'].includes(activeStrategy)) {
-            recValue = `${d.expiry_min}m${sessionTag} | ${d.atr || "0.00"}`;
+        } else if (isStrat123) {
+            recValue = `${countdownHtml}${sessionTag} | ${d.atr || "0.00"}`;
             col1 = `<span class="badge ${d.signal?.includes('BUY') ? 'bg-success' : (d.signal?.includes('SELL') ? 'bg-danger' : 'bg-secondary')}">${d.signal || 'NEUTRAL'}</span>`;
             col4 = d.direction === 'CALL' ? '<span class="text-success fw-bold">Above Open</span>' : (d.direction === 'PUT' ? '<span class="text-danger fw-bold">Below Open</span>' : '<span class="text-muted">Neutral</span>');
         } else {
-            if (contractType === 'multiplier') {
-                recValue = `x${d.multiplier}${sessionTag} | ${d.atr}`;
-            } else {
-                recValue = `${d.expiry_min}m${sessionTag} | ${d.atr_1m || d.atr || "0.00"}`;
-            }
+            recValue = `${countdownHtml}${sessionTag} | ${d.atr || "0.00"}`;
         }
 
         const displayConf = d.label ? `${d.label} (${d.confidence}%)` : `${d.confidence}%`;
         const streakBadge = streak >= 3 ? `<span class="badge bg-danger ms-1" title="Loss Streak: ${streak}">S</span>` : '';
 
+        // Echo Forecast Column
+        let echoHtml = '<span class="text-muted">N/A</span>';
+        if (d.fcast_data && d.fcast_data.correlation) {
+            const eDir = d.fcast_data.direction || "NEUTRAL";
+            const eColor = eDir === 'CALL' ? 'text-success' : 'text-danger';
+            echoHtml = `<span class="${eColor} fw-bold">${eDir}</span> <small class="text-muted">(${d.fcast_data.correlation.toFixed(2)})</small>`;
+        }
+
+        // TP/SL/RR Column
+        let tpslHtml = '<span class="text-muted">N/A</span>';
+        if (d.tp && d.sl) {
+            tpslHtml = `T:${d.tp}<br>S:${d.sl}<br><small class="text-info">RR:${d.rr || 0}</small>`;
+        }
+
+        // Final Signal Label
+        let signalLabelHtml = `<span class="badge ${d.signal === 'BUY' ? 'bg-success' : (d.signal === 'SELL' ? 'bg-danger' : 'bg-secondary')}">${d.signal}</span>`;
+
         return `
             <tr>
                 <td><strong>${sym}</strong>${streakBadge}</td>
                 <td class="${confColor} fw-bold">${displayConf} <small class="text-muted">/${threshold}%</small></td>
-                <td class="${dirColor} fw-bold">${d.direction}</td>
+                <td class="${dirColor} fw-bold">${signalLabelHtml} / ${directionLabel}</td>
                 <td><small>${recValue}</small></td>
-                <td style="${isSmallOff ? 'display:none' : ''}">${col1}</td>
-                <td style="${isMidOff ? 'display:none' : ''}">${col2}</td>
-                <td style="${isHighOff ? 'display:none' : ''}">${col3}</td>
+                <td><small>${echoHtml}</small></td>
+                <td><small>${tpslHtml}</small></td>
+                <td style="${(activeStrategy === 'strategy_7' && isSmallOff) || isStrat123 ? 'display:none' : ''}">${col1}</td>
+                <td style="${(activeStrategy === 'strategy_7' && isMidOff) || isStrat123 ? 'display:none' : ''}">${col2}</td>
+                <td style="${(activeStrategy === 'strategy_7' && isHighOff) || isStrat123 ? 'display:none' : ''}">${col3}</td>
                 <td>${col4}</td>
             </tr>
         `;
@@ -393,6 +413,12 @@ function closeTrade(id) {
 function startCountdownTimer() {
     setInterval(() => {
         document.querySelectorAll('.expiry-countdown').forEach(el => {
+            const expiry = parseInt(el.getAttribute('data-expiry'));
+            el.textContent = formatCountdown(expiry);
+        });
+
+        // Update Screener Countdown
+        document.querySelectorAll('.screener-expiry-countdown').forEach(el => {
             const expiry = parseInt(el.getAttribute('data-expiry'));
             el.textContent = formatCountdown(expiry);
         });

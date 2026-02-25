@@ -90,8 +90,8 @@
             background: rgba(255, 255, 255, 0.05);
         }
 
-        .trade-card.buy { border-left-color: #28a745; }
-        .trade-card.sell { border-left-color: #dc3545; }
+        .trade-card.buy, .trade-card.long { border-left-color: #28a745; }
+        .trade-card.sell, .trade-card.short { border-left-color: #dc3545; }
     </style>
 </head>
 
@@ -225,13 +225,15 @@
                                 <thead id="screenerTableHeader">
                                     <tr id="screenerHeaderRow">
                                         <th>Symbol</th>
-                                        <th>Confidence / Threshold</th>
-                                        <th>Direction</th>
-                                        <th id="screenerRecHeader">Recommendation</th>
+                                        <th>Conf / Thres</th>
+                                        <th>Signal / Direction</th>
+                                        <th id="screenerRecHeader">Expiry | ATR</th>
+                                        <th id="screenerEchoHeader">Echo Forecast</th>
+                                        <th id="screenerTpslHeader">TP / SL / RR</th>
                                         <th class="screener-dynamic-col" data-col="1">Trend</th>
-                                        <th class="screener-dynamic-col" data-col="2">Momentum</th>
-                                        <th class="screener-dynamic-col" data-col="3">Volatility</th>
-                                        <th class="screener-dynamic-col" data-col="4">Structure</th>
+                                        <th class="screener-dynamic-col" data-col="2">Mom</th>
+                                        <th class="screener-dynamic-col" data-col="3">Vol</th>
+                                        <th class="screener-dynamic-col" data-col="4">Struct</th>
                                     </tr>
                                 </thead>
                                 <tbody id="screenerTableBody">
