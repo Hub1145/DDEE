@@ -1,28 +1,20 @@
 {
-  "deriv_api_token": "381klIwm4Mr8BTT",
-  "deriv_app_id": "62845",
-  "symbols": [
-    "R_100",
-    "R_75",
-    "R_25"
+  "api_accounts": [
+    {"api_key": "", "api_secret": "", "name": "User 1", "enabled": true},
+    {"api_key": "", "api_secret": "", "name": "User 2", "enabled": false},
+    {"api_key": "", "api_secret": "", "name": "User 3", "enabled": false}
   ],
-  "use_fixed_balance": true,
-  "balance_value": 10,
-  "max_daily_loss_pct": 5,
-  "entry_type": "candle_close",
   "is_demo": true,
-  "log_level": "INFO",
-  "tp_enabled": false,
-  "tp_value": 0,
-  "sl_enabled": false,
-  "sl_value": 0,
-  "force_close_enabled": false,
-  "force_close_duration": 60,
-  "active_strategy": "strategy_7",
-  "contract_type": "rise_fall",
-  "multiplier_value": "100",
-  "custom_expiry": "default",
-  "strat7_small_tf": "60",
-  "strat7_mid_tf": "300",
-  "strat7_high_tf": "3600"
+  "symbols": ["LINKUSDC"],
+  "strategy": {
+    "symbol": "LINKUSDC",
+    "total_quantity": 800,
+    "total_fractions": 8,
+    "price_deviation": 0.60,
+    "leverage": 20,
+    "margin_type": "CROSSED",
+    "direction": "LONG",
+    "entry_price": 8.565
+  },
+  "log_level": "INFO"
 }
