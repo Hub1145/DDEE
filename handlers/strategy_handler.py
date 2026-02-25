@@ -180,10 +180,10 @@ class StrategyHandler:
         # Signal Filtering
         signal = None
         if is_cross_up and echo_confirmed:
-            if ta_signal == "BUY" or (ta_signal == "STRONG_BUY" and is_candle_close):
+            if "BUY" in ta_signal:
                 signal = 'buy'
         elif is_cross_down and echo_confirmed:
-            if ta_signal == "SELL" or (ta_signal == "STRONG_SELL" and is_candle_close):
+            if "SELL" in ta_signal:
                 signal = 'sell'
 
         if signal:
@@ -213,8 +213,14 @@ class StrategyHandler:
 
         signal = None
         for z in zones:
-            # Check if current price is inside the 5m wick zone
-            in_zone = (current_price >= z['bottom'] and current_price <= z['top'])
+            # Entry Mode Sensitivity
+            if is_candle_close and sd.get('ltf_candles'):
+                # Candle Close Mode: Did the closed candle touch or sit in the zone?
+                last_c = sd['ltf_candles'][-1]
+                in_zone = not (last_c['high'] < z['bottom'] or last_c['low'] > z['top'])
+            else:
+                # Tick Mode: Is the current price inside the 5m wick zone?
+                in_zone = (current_price >= z['bottom'] and current_price <= z['top'])
 
             if in_zone:
                 if z['type'] == 'S': # Support Zone
