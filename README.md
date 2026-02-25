@@ -5,73 +5,82 @@ A high-performance, modular trading bot designed for Deriv Volatility Indices. T
 ## 🚀 Key Features
 
 ### 🧠 Expert Intelligence Engine (v5.3)
-- **LuxAlgo Echo Forecast**: Ported algorithmic engine that identifies historical price actions (fractals) and projects the most likely future price path using Pearson correlation.
-- **LuxAlgo Pivot SNR**: Support and Resistance zones identified via LuxAlgo-style 15-bar pivots, with zones precisely defined from High/Low to the midpoint of the wick.
-- **Structural RR Gatekeeper**: All entries require a projected Reward/Risk ratio of ≥ 1.5 based on the forecasted path, preventing entries near exhaustion points.
-- **Smart Expiry (Target Point Arrival)**: Dynamically calculates optimal trade duration by pinpointing the exact future candle where price is projected to reach its ATR target.
+- **LuxAlgo Echo Forecast**: Advanced algorithmic engine that identifies historical fractal similarities and projects the most likely future price path using Pearson correlation. Validates Direction, TP, SL, and Expiry.
+- **LuxAlgo Pivot SNR**: Strategy 4 implements sophisticated 15-bar pivot logic to define Support and Resistance zones from the High/Low to the midpoint of the wick.
+- **Structural RR Gatekeeper**: All entries require a projected Reward/Risk ratio of ≥ 1.5 based on the forecasted structural path, filtered through an ATR-based risk floor.
+- **Smart Expiry (Target Arrival)**: Dynamically calculates optimal trade duration by pinpointing the exact future candle where price is projected to reach its ATR target within the Echo window.
 - **Smart & Tiered Multipliers**:
     - **Tiered Base Levels**: Strategy 1 (50x), Strategy 2 (100x), Strategy 3 (200x).
-    - **Volatility Scaling**: Multipliers automatically adjust based on relative volatility (ATR as % of price).
-    - **Liquidation Protection**: Automatically scales multiplier amounts down if the Stop Loss distance is too close to the liquidation point.
-    - **Symbol-Specific Matching**: Bot fetches and utilizes only the supported multiplier ranges for each specific Deriv symbol.
+    - **Volatility Scaling**: Multipliers automatically scale based on relative volatility (ATR % of price).
+    - **Liquidation Protection**: Automatically reduces multiplier values if the Stop Loss is too close to the liquidation point.
 
 ### 🏗 Modular Architecture
-- **Distributed Workload**: Specialized handlers for Technical Analysis (`ta_handler`), Dashboard Screener (`screener_handler`), and Strategy Trigger Logic (`strategy_handler`).
-- **Persistent Connection Manager**: Centralized WebSocket manager with a 1-minute candle cache, eliminating API rate limit errors and "Deriv API error: Sorry..." responses.
-- **Threaded Async Execution**: Concurrent monitoring of multiple symbols and positions using `ThreadPoolExecutor` and `asyncio`.
+- **Distributed Handlers**: Optimized workload division using specialized modules:
+    - `ta_handler.py`: Centralized Technical Analysis and persistent API connection.
+    - `screener_handler.py`: Real-time dashboard intelligence and strategy scoring.
+    - `strategy_handler.py`: High-precision entry and exit trigger logic.
+    - `utils.py`: Core algorithmic engines (Echo, SuperTrend, SNR, PA).
+- **Persistent Connection Manager**: Centralized WebSocket manager with a 1-minute candle cache, strictly respecting Deriv API rate limits and eliminating "Sorry, an error occurred" responses.
+- **Threaded Async Execution**: concurrent monitoring of multiple symbols and positions using `ThreadPoolExecutor` and `asyncio`.
 
 ### 📊 Intelligent Dashboard
-- **Real-time Metrics**: Dynamic display of Balance, PNL, Win Rate, and Avg PNL, all rounded to a precise 1 decimal place.
-- **Live Position Monitoring**: Real-time tracking of active contracts with PNL, entry spot, and expiry countdowns.
-- **Dynamic Screener**: Strategy-specific technical analysis including Four-Pillar TA Scores (Trend, Momentum, Volatility, Structure) and Echo correlation.
+- **Real-time Metrics**: Dynamic display of Balance, PNL, Win Rate, and Avg PNL, all rounded to 1 decimal place for professional clarity.
+- **Live Screener**: Advanced analytics including Four-Pillar TA Scores (Trend, Momentum, Volatility, Structure) and fractal alignment.
+- **Multiplier Mode UI**: Automatically switches terminology from CALL/PUT to BUY/SELL and displays calculated TP/SL targets when Multiplier contracts are active.
 
 ---
 
 ## 📉 Trading Strategies
 
 ### 🔹 Strategy 1: Slow Breakout (Daily / 15m)
-- **Entry**: Price crosses the **Daily Open** (HTF). Requires agreement from **15m TA** (BUY/SELL) and **Echo Forecast** confirmation.
-- **Exit**: LTF signal flip, Daily Open cross-back (Multi), or +2 Daily ATR target (Multi).
-- **Multiplier**: Low (50x base).
+- **Concept**: Captures long-term momentum shifts.
+- **Entry**: Price crosses **Daily Open** (HTF). Requires agreement from **15m TA** and **Echo Forecast**.
+- **Exit**: LTF signal flip or hit targets.
 
 ### 🔹 Strategy 2: Moderate Breakout (1h / 3m)
-- **Entry**: Price crosses the **1-Hour Open**. Requires agreement from **3m TA** and **Structural RR** validation.
-- **Exit**: 3m LTF signal flip or hit TP/SL.
-- **Multiplier**: Medium (100x base).
+- **Concept**: Balanced day-trading approach.
+- **Entry**: Price crosses **1-Hour Open**. Requires **3m TA** alignment and **Structural RR** validation.
+- **Exit**: LTF signal flip.
 
 ### 🔹 Strategy 3: Fast Breakout (15m / 1m)
-- **Entry**: Price crosses the **15-Minute Open**. Requires agreement from **1m TA** and **Echo Forecast**.
-- **Exit**: 1m LTF signal flip or hit TP/SL.
-- **Multiplier**: High (200x base).
+- **Concept**: Scalping high-velocity moves.
+- **Entry**: Price crosses **15-Minute Open**. Requires **1m TA** and **Echo Forecast** confirmation.
+- **Exit**: 1m signal flip.
 
 ### 🔹 Strategy 4: LuxAlgo SNR (Rise & Fall ONLY)
-- **Entry**: Price enters a **5m Pivot Zone** (High/Low to Mid-wick). Requires **1m TA Reversal** (BUY at Support, SELL at Resistance) and **PA Pattern** validation.
-- **Exit**: Constant **1-minute expiry**.
-- **Management**: Removed complex exit logic to focus on pure zone-to-zone reversal execution.
+- **Concept**: Pure structural reversal trading.
+- **Entry**: Price enters a **5m Pivot Zone**. Requires **1m Bullish/Bearish Reversal** (TA + PA Pattern).
+- **Exit**: Constant **1-minute expiry** for precision scalping.
 
-### 🔹 Strategy 5: Synthetic Intelligence
-- **Entry**: Triple EMA alignment (1m, 5m, 1h) + Four-Pillar TA Score > 72%.
-- **Exit**: Expert early-close on signal flip or Neutral transition while in loss.
-- **Expiry**: Precision Target Arrival (Smart Expiry).
+### 🔹 Strategy 5: Synthetic Intelligence Screener
+- **Concept**: Weighted multi-pillar decision engine.
+- **Architecture**:
+    - **Trend**: EMA 50/200, SuperTrend, ADX.
+    - **Momentum**: RSI, Stoch RSI, MACD Divergence.
+    - **Volatility**: ATR, Bollinger Bands.
+    - **Structure**: 5m Fractals (Scalp) or 1H Order Blocks (Multiplier).
+- **Thresholds**: >=72% (Rise & Fall), >=68% (Multiplier).
+- **Adaptive Sensitivity**: Increases confidence thresholds (+5%) following 3+ consecutive losses on a symbol.
 
 ### 🔹 Strategy 6: Intelligence Legacy
-- **Entry**: RSI Oversold/Overbought on 1m + 15m Trend Alignment.
-- **Exit**: Intelligent early-exit on signal flip.
+- **Concept**: Exhaustive suite of 20+ indicators with weighted importance.
+- **Indicator Blocks**: Trend (W3), Momentum (W2), Volatility (W1), Structure (W2).
+- **Execution**: Confidence >= 60% across Core (1H), Timing (1m), and Bias (4H) alignment.
 
 ### 🔹 Strategy 7: Intelligent Multi-TF Alignment
-- **Feature**: Supports switching "OFF" specific timeframes (Small, Mid, High) to focus on custom alignment (e.g., 1-TF or 2-TF).
-- **Cool-down**: Signal cooling in 1-TF mode prevents entry spamming.
+- **Concept**: User-customizable timeframe alignment.
+- **Feature**: Supports "OFF" switches for Small, Mid, or High timeframes.
+- **Logic**: Enforces alignment across all active TFs with built-in signal cooling.
 
 ---
 
-## 🛠 Risk & Position Management
+## 🛠 Risk Management
 
-- **Expert Monitoring**: The bot actively monitors "Signal Support." If the underlying LTF TA signal flips against the trade, it is exited immediately to preserve capital.
-- **Free Ride Protocol (Multipliers)**: SL is aggressively trailed at a 1.0x ATR distance once a trade reaches 1.5x ATR in profit.
-- **Configurable Targets**:
-    - `max_daily_loss_pct`: Pauses trading if the daily loss limit is hit.
-    - `max_daily_profit_pct`: Pauses trading once the daily profit goal is achieved.
-- **TP/SL Enforcement**: All positions (Rise & Fall and Multipliers) strictly respect the TP/SL values set in the dashboard config.
+- **Daily Targets**:
+    - `max_daily_loss_pct`: Automatic pause when the daily loss limit is hit.
+    - `max_daily_profit_pct`: Automatic pause when the daily profit goal is reached.
+- **Expert Early Exit**: Bot monitors LTF "Signal Support." If the signal flips against an open trade, it exits immediately to preserve balance.
+- **Free Ride Protocol**: For Multipliers, SL is aggressively trailed at a 1.0x ATR distance once the position hits 1.5x ATR in profit.
 
 ---
 
@@ -79,8 +88,8 @@ A high-performance, modular trading bot designed for Deriv Volatility Indices. T
 
 1.  **Install Dependencies**: `pip install -r requirements.txt`
 2.  **Run Application**: `python app.py`
-3.  **Access Dashboard**: Open `http://localhost:3000`.
-4.  **Configuration**: Navigate to the **Config** tab to set your **Deriv API Token** and **App ID**.
+3.  **Access Dashboard**: `http://localhost:3000`
+4.  **Configuration**: Navigate to **Config** to set your **Deriv API Token**. Bot handles App ID 62845 by default.
 
 ---
 
