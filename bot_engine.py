@@ -248,12 +248,13 @@ class TradingBotEngine:
                         for g, c in [(60, 100), (300, 100), (900, 200), (3600, 200), (86400, 50)]:
                             self._fetch_history(ws, symbol, g, c)
                             time.sleep(0.5)
-                        ws.send(json.dumps({"contracts_for": symbol}))
                     elif strat_key == 'strategy_6':
                         for g, c in [(60, 100), (900, 200), (3600, 200), (86400, 50)]:
                             self._fetch_history(ws, symbol, g, c)
                             time.sleep(0.5)
-                        ws.send(json.dumps({"contracts_for": symbol}))
+
+                    # Always fetch available multipliers for the symbol
+                    ws.send(json.dumps({"contracts_for": symbol}))
                     time.sleep(0.5)
 
         elif msg_type == 'balance':
@@ -289,6 +290,9 @@ class TradingBotEngine:
                     multipliers = c.get('multiplier_range', [])
                     break
             if multipliers:
+                with self.data_lock:
+                    if symbol in self.symbol_data:
+                        self.symbol_data[symbol]['available_multipliers'] = multipliers
                 self.log(f"Available multipliers for {symbol}: {multipliers}")
                 self.emit('multipliers_update', {'symbol': symbol, 'multipliers': multipliers})
 
@@ -353,7 +357,8 @@ class TradingBotEngine:
                 'last_trade_hour': None,
                 'h4_candles': [],
                 'm3_candles': [],
-                'atr_1m_history': deque(maxlen=50)
+                'atr_1m_history': deque(maxlen=50),
+                'available_multipliers': []
             }
 
     def _fetch_history(self, ws, symbol, granularity, count):
@@ -970,6 +975,26 @@ class TradingBotEngine:
             # Ensure mult_val is at least a minimum sensible value for the symbol (usually 10x)
             mult_val = max(10, mult_val)
 
+            # 4. Match with AVAILABLE multipliers for the symbol
+            available = sd.get('available_multipliers', [])
+            if available:
+                # Find the largest available multiplier that is <= mult_val
+                best_match = None
+                sorted_avail = sorted(available)
+                for a in sorted_avail:
+                    if a <= mult_val:
+                        best_match = a
+                    else:
+                        break
+
+                if best_match is None:
+                    # mult_val is smaller than any available. Use smallest available.
+                    best_match = sorted_avail[0]
+
+                if best_match != mult_val:
+                    self.log(f"Expert Multiplier: Adjusting {mult_val}x to nearest available {best_match}x for {symbol}.")
+                mult_val = best_match
+
             # Convert targets to USD
             sl_usd = abs((sl_price - entry_price) / entry_price) * mult_val * amount if entry_price and sl_price else 0.1 * amount
             tp_usd = abs((tp_price - entry_price) / entry_price) * mult_val * amount if entry_price and tp_price else 0.2 * amount
@@ -1411,12 +1436,12 @@ class TradingBotEngine:
                         for g, c in [(60, 100), (300, 100), (900, 200), (3600, 200), (86400, 50)]:
                             self._fetch_history(self.ws, sym, g, c)
                             time.sleep(0.4)
-                        self.ws.send(json.dumps({"contracts_for": sym}))
                     elif new_strat == 'strategy_6':
                         for g, c in [(60, 100), (900, 200), (3600, 200), (86400, 50)]:
                             self._fetch_history(self.ws, sym, g, c)
                             time.sleep(0.4)
-                        self.ws.send(json.dumps({"contracts_for": sym}))
+
+                    self.ws.send(json.dumps({"contracts_for": sym}))
                     time.sleep(0.5)
             return {"success": True}
 
@@ -1442,12 +1467,12 @@ class TradingBotEngine:
                     for g, c in [(60, 100), (300, 100), (900, 200), (3600, 200), (86400, 50)]:
                         self._fetch_history(self.ws, symbol, g, c)
                         time.sleep(0.4)
-                    self.ws.send(json.dumps({"contracts_for": symbol}))
                 elif new_strat == 'strategy_6':
                     for g, c in [(60, 100), (900, 200), (3600, 200), (86400, 50)]:
                         self._fetch_history(self.ws, symbol, g, c)
                         time.sleep(0.4)
-                    self.ws.send(json.dumps({"contracts_for": symbol}))
+
+                self.ws.send(json.dumps({"contracts_for": symbol}))
                 time.sleep(0.5)
 
             removed_symbols = old_symbols - new_symbols

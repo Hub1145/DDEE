@@ -323,8 +323,8 @@ class ScreenerHandler:
             indicators = get_ta_indicators(symbol, ref_tf)
             trend, momentum, volatility, structure = self._calculate_scores(symbol, indicators, df_ref)
 
-            confidence = 80 if signal != "WAIT" else 50
-            if "STRONG" in str(active_recs): confidence = 90
+            confidence = 80 if signal != "WAIT" else 0
+            if signal != "WAIT" and "STRONG" in str(active_recs): confidence = 90
 
             # Echo Forecast Intelligence (Use Mid TF for Echo)
             df_echo = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, m_tf or "5m"), manager.loop).result()
