@@ -59,6 +59,54 @@ def calculate_fractals(df, window=2):
             is_low[i] = True
     return pd.Series(is_high, index=df.index), pd.Series(is_low, index=df.index)
 
+def calculate_pivot_points(df, left=15, right=15):
+    """
+    Identifies LuxAlgo-style pivot highs and lows.
+    A pivot high is a peak where the high of a bar is higher than the highs of
+    'left' bars before it and 'right' bars after it.
+    """
+    if len(df) < (left + right + 1):
+        return pd.Series([False]*len(df)), pd.Series([False]*len(df))
+
+    highs = df['high'].values
+    lows = df['low'].values
+
+    pivot_highs = [False] * len(df)
+    pivot_lows = [False] * len(df)
+
+    for i in range(left, len(df) - right):
+        # Pivot High
+        val_h = highs[i]
+        is_high = True
+        for j in range(i - left, i):
+            if highs[j] > val_h:
+                is_high = False
+                break
+        if is_high:
+            for j in range(i + 1, i + right + 1):
+                if highs[j] >= val_h:
+                    is_high = False
+                    break
+        if is_high:
+            pivot_highs[i] = True
+
+        # Pivot Low
+        val_l = lows[i]
+        is_low = True
+        for j in range(i - left, i):
+            if lows[j] < val_l:
+                is_low = False
+                break
+        if is_low:
+            for j in range(i + 1, i + right + 1):
+                if lows[j] <= val_l:
+                    is_low = False
+                    break
+        if is_low:
+            pivot_lows[i] = True
+
+    return pd.Series(pivot_highs), pd.Series(pivot_lows)
+
 def calculate_order_blocks(df, lookback=100):
     if len(df) < lookback: return []
     obs = []
@@ -203,15 +251,15 @@ def calculate_snr_zones(symbol, sd, granularity=None, active_strategy=None):
 
 def calculate_5m_snr_v5(m5_candles):
     """
-    v5.2 Strategy 4: 5m SNR Zones.
+    v5.3 Strategy 4: 5m SNR Zones using LuxAlgo Pivot Logic.
     Zones are defined from the High/Low to the midpoint of the wick (High/Low to Body).
     """
-    if len(m5_candles) < 20:
+    if len(m5_candles) < 40:
         return []
 
-    # Get recent fractal highs/lows on 5m
+    # Get recent pivot highs/lows on 5m (LuxAlgo style 15-15)
     df = pd.DataFrame(m5_candles)
-    highs, lows = calculate_fractals(df, window=2)
+    highs, lows = calculate_pivot_points(df, left=15, right=15)
 
     zones = []
     for i in range(len(df)):

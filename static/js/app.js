@@ -200,7 +200,7 @@ function setupSocketListeners() {
         if (document.getElementById('avgPnlDisplay')) {
             const avg = data.avg_pnl || 0;
             const el = document.getElementById('avgPnlDisplay');
-            el.textContent = `$${Number(avg).toFixed(2)}`;
+            el.textContent = `$${Number(avg).toFixed(1)}`;
             el.className = `stat-value ${avg >= 0 ? 'text-success' : 'text-danger'}`;
         }
     });
