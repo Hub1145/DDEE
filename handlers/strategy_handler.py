@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from handlers.utils import (
     calculate_supertrend, detect_macd_divergence, check_price_action_patterns,
     score_reversal_pattern, calculate_snr_zones, calculate_echo_forecast,
-    calculate_structural_rr, calculate_5m_snr_v5
+    calculate_5m_snr_v5
 )
 from handlers.ta_handler import get_ta_signal
 
@@ -94,15 +94,6 @@ class StrategyHandler:
         if signal not in ['BUY', 'SELL']:
             return
 
-        # v5.2 Structural Entry Validation (Gatekeeper)
-        # We only enter if Reward/Risk based on Echo path is favorable (> 1.5)
-        fcast_data = data.get('fcast_data')
-        if fcast_data and 'forecast_prices' in fcast_data:
-            rr = calculate_structural_rr(sd.get('last_tick'), fcast_data['forecast_prices'], signal)
-            if rr < 1.5:
-                # If RR is low, it means we are likely at the end of the move or too close to a peak.
-                # We wait for a better entry (pullback).
-                return
 
         # Check if already in position for this symbol
         for cid, c in self.bot.contracts.items():
@@ -160,7 +151,7 @@ class StrategyHandler:
                 elif last_price >= htf_open and current_price < htf_open:
                     is_cross_down = True
 
-        # Echo Forecast Confirmation & Structural RR Gatekeeper
+        # Echo Forecast Confirmation
         echo_confirmed = False
         ltf_df = pd.DataFrame(sd.get('ltf_candles', []))
         if not ltf_df.empty:
@@ -168,13 +159,9 @@ class StrategyHandler:
             if fcast_prices and correlation > 0.5:
                 fcast_final = fcast_prices[-1]
 
-                # Check RR to ensure we aren't buying at the top or selling at the bottom
-                direction = "BUY" if is_cross_up else "SELL"
-                rr = calculate_structural_rr(current_price, fcast_prices, direction)
-
-                if is_cross_up and fcast_final > current_price and rr >= 1.5:
+                if is_cross_up and fcast_final > current_price:
                     echo_confirmed = True
-                elif is_cross_down and fcast_final < current_price and rr >= 1.5:
+                elif is_cross_down and fcast_final < current_price:
                     echo_confirmed = True
 
         # Signal Filtering (Prioritize standard BUY/SELL over STRONG signals for crossovers)

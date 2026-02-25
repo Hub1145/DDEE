@@ -1198,8 +1198,8 @@ class TradingBotEngine:
             if strat_key in ['strategy_1', 'strategy_2', 'strategy_3', 'strategy_4', 'strategy_5', 'strategy_6', 'strategy_7']:
                 tp_price, sl_price = get_smart_targets(entry, internal_side, atr, confidence, fcast_data=fcast_data)
 
-                if tp_price: self.contracts[cid]['tp_price'] = tp_price
-                if sl_price: self.contracts[cid]['sl_price'] = sl_price
+                if tp_price: self.contracts[cid]['tp_price'] = round(tp_price, 4)
+                if sl_price: self.contracts[cid]['sl_price'] = round(sl_price, 4)
             else:
                 # Fallback to fixed USD/percentage TP/SL for simple breakout strategies
                 tp_usd = tp_val if use_fixed else (stake * tp_val / 100.0)

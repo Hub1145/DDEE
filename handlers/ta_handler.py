@@ -190,7 +190,15 @@ class ConnectionManager:
     async def call(self, request: dict):
         # Retry mechanism for connection hiccups
         for attempt in range(3):
-            if not self.ws or not self.ws.open:
+            # Safer check for websocket state to avoid 'ClientConnection' object has no attribute 'open'
+            is_connected = False
+            if self.ws:
+                try:
+                    is_connected = not self.ws.closed
+                except AttributeError:
+                    is_connected = True # Fallback
+
+            if not is_connected:
                 await asyncio.sleep(1)
                 continue
 
