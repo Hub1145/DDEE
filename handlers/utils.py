@@ -201,6 +201,45 @@ def calculate_snr_zones(symbol, sd, granularity=None, active_strategy=None):
     final_zones.sort(key=lambda x: x['touches'], reverse=True)
     return final_zones[:5]
 
+def calculate_5m_snr_v5(m5_candles):
+    """
+    v5.2 Strategy 4: 5m SNR Zones.
+    Zones are defined from the High/Low to the midpoint of the wick (High/Low to Body).
+    """
+    if len(m5_candles) < 20:
+        return []
+
+    # Get recent fractal highs/lows on 5m
+    df = pd.DataFrame(m5_candles)
+    highs, lows = calculate_fractals(df, window=2)
+
+    zones = []
+    for i in range(len(df)):
+        c = m5_candles[i]
+        if highs.iloc[i]:
+            body_top = max(c['open'], c['close'])
+            # Resistance zone: High to midpoint of upper wick
+            zones.append({
+                'price': c['high'],
+                'top': c['high'],
+                'bottom': (c['high'] + body_top) / 2,
+                'type': 'R',
+                'epoch': c['epoch']
+            })
+        if lows.iloc[i]:
+            body_bottom = min(c['open'], c['close'])
+            # Support zone: Low to midpoint of lower wick
+            zones.append({
+                'price': c['low'],
+                'bottom': c['low'],
+                'top': (c['low'] + body_bottom) / 2,
+                'type': 'S',
+                'epoch': c['epoch']
+            })
+
+    # Keep only the last 10 unique zones
+    return zones[-10:]
+
 def score_reversal_pattern(symbol, pattern, candles):
     if not candles: return 0
     c = candles[-1]

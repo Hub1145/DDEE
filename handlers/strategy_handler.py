@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from handlers.utils import (
     calculate_supertrend, detect_macd_divergence, check_price_action_patterns,
     score_reversal_pattern, calculate_snr_zones, calculate_echo_forecast,
-    calculate_structural_rr
+    calculate_structural_rr, calculate_5m_snr_v5
 )
 from handlers.ta_handler import get_ta_signal
 
@@ -191,79 +191,45 @@ class StrategyHandler:
             self.bot._execute_trade(symbol, signal)
 
     def _process_strategy_4(self, symbol, is_candle_close):
+        """Strategy 4: 5m SNR + 1m Reversal (Rise & Fall Only)"""
         sd = self.bot.symbol_data[symbol]
-        current_ltf = sd.get('current_ltf_candle')
         current_price = sd.get('last_tick')
+        if current_price is None: return
 
-        if current_ltf is None or current_price is None: return
+        # 1. Update 5m Zones
+        if 'm5_candles' in sd:
+            sd['snr_zones_v5'] = calculate_5m_snr_v5(sd['m5_candles'])
 
-        # SNR Invalidation on candle close
-        zones = sd.get('snr_zones', [])
-        if is_candle_close:
-            remaining_zones = []
-            for z in zones:
-                if z['type'] in ['S', 'Flip'] and current_ltf['close'] < (z['price'] * 0.9995): continue
-                if z['type'] in ['R', 'Flip'] and current_ltf['close'] > (z['price'] * 1.0005): continue
-                remaining_zones.append(z)
-            sd['snr_zones'] = remaining_zones
-            zones = remaining_zones
-
-        entry_type = self.bot.config.get('entry_type', 'candle_close')
-        if entry_type == 'candle_close' and not is_candle_close: return
+        zones = sd.get('snr_zones_v5', [])
         if not zones: return
 
+        # 2. Check if already in position
         for cid, c in self.bot.contracts.items():
             if c['symbol'] == symbol: return
 
-        pattern = check_price_action_patterns(sd['ltf_candles'])
-        if not pattern or pattern == "marubozu": return
-
-        rsi_m5 = 50
-        if len(sd.get('m5_candles', [])) >= 14:
-            df_m5 = pd.DataFrame(sd['m5_candles'])
-            rsi_m5 = ta.momentum.RSIIndicator(df_m5['close']).rsi().iloc[-1]
-
-        pattern_score = score_reversal_pattern(symbol, pattern, sd['ltf_candles'])
-        if pattern_score < 2: return
-
-        ema50_h1 = None
-        if len(sd.get('htf_candles', [])) >= 50:
-            df_h1 = pd.DataFrame(sd['htf_candles'])
-            ema50_h1 = ta.trend.EMAIndicator(df_h1['close'], window=50).ema_indicator().iloc[-1]
+        # 3. 1m Reversal Checks (TA + PA)
+        ta_signal = get_ta_signal(symbol, "1m")
+        pa_pattern = check_price_action_patterns(sd.get('ltf_candles', []))
 
         signal = None
         for z in zones:
-            buffer = z['price'] * 0.0002
-            touched = current_ltf['low'] <= (z['price'] + buffer) and current_ltf['high'] >= (z['price'] - buffer)
+            # Check if current price is inside the 5m wick zone
+            in_zone = (current_price >= z['bottom'] and current_price <= z['top'])
 
-            if touched:
-                if z['type'] in ['S', 'Flip'] and pattern in ['bullish_pin', 'bullish_engulfing', 'doji', 'tweezer_bottom', 'bullish_harami']:
-                    if rsi_m5 < 80 and (ema50_h1 is None or current_price > ema50_h1):
-                        signal = 'buy'
-                        z['total_lifetime_touches'] = z.get('total_lifetime_touches', 0) + 1
-                        break
-                elif z['type'] in ['R', 'Flip'] and pattern in ['bearish_pin', 'bearish_engulfing', 'doji', 'tweezer_top', 'bearish_harami']:
-                    if rsi_m5 > 20 and (ema50_h1 is None or current_price < ema50_h1):
-                        signal = 'sell'
-                        z['total_lifetime_touches'] = z.get('total_lifetime_touches', 0) + 1
-                        break
-
-        # Echo Forecast Confirmation & Structural RR for SNR
-        if signal:
-            ltf_df = pd.DataFrame(sd.get('ltf_candles', []))
-            if not ltf_df.empty:
-                fcast_prices, correlation = calculate_echo_forecast(ltf_df)
-                if fcast_prices and correlation > 0.5:
-                    fcast_final = fcast_prices[-1]
-                    rr = calculate_structural_rr(current_price, fcast_prices, signal)
-
-                    if signal == 'buy':
-                        if fcast_final <= current_price or rr < 1.5:
-                            signal = None # Echo doesn't confirm reversal UP or poor RR
-                    elif signal == 'sell':
-                        if fcast_final >= current_price or rr < 1.5:
-                            signal = None # Echo doesn't confirm reversal DOWN or poor RR
+            if in_zone:
+                if z['type'] == 'S': # Support Zone
+                    # Look for Bullish Reversal on 1m
+                    if "BUY" in ta_signal:
+                        if pa_pattern and any(p in pa_pattern for p in ['bullish', 'pin', 'doji', 'bottom']):
+                            signal = 'buy'
+                            break
+                elif z['type'] == 'R': # Resistance Zone
+                    # Look for Bearish Reversal on 1m
+                    if "SELL" in ta_signal:
+                        if pa_pattern and any(p in pa_pattern for p in ['bearish', 'pin', 'doji', 'top']):
+                            signal = 'sell'
+                            break
 
         if signal:
-            self.bot.log(f"Strategy 4 triggered {signal} for {symbol}")
+            self.bot.log(f"Strategy 4 [SNR v5] triggered {signal} for {symbol} at zone {z['type']}. TA: {ta_signal}, PA: {pa_pattern}")
             self.bot._execute_trade(symbol, signal)

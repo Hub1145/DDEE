@@ -128,7 +128,7 @@ class ScreenerHandler:
             df5m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "5m"), manager.loop).result()
             trend, momentum, volatility, structure = self._calculate_scores(symbol, indicators, df5m)
 
-            confidence = 75 # Standard for alignment
+            confidence = 75 if signal != "WAIT" else 0
 
             # 1. Echo Forecast Intelligence
             fcast_prices, correlation = calculate_echo_forecast(df5m)
@@ -140,9 +140,9 @@ class ScreenerHandler:
 
                 # Boost confidence if Echo agrees with Signal
                 if signal == 'BUY' and fcast_final > df5m['close'].iloc[-1]:
-                    confidence += (correlation * 15)
+                    confidence = min(100, confidence + (correlation * 15))
                 elif signal == 'SELL' and fcast_final < df5m['close'].iloc[-1]:
-                    confidence += (correlation * 15)
+                    confidence = min(100, confidence + (correlation * 15))
 
                 fcast_data = {
                     'high': fcast_high, 'low': fcast_low, 'final': fcast_final,
@@ -152,18 +152,18 @@ class ScreenerHandler:
 
             expiry = predict_expiry_v5(symbol, 'strategy_5', 1, 60, confidence, fcast_data, df1m, direction=direction)
 
-            atr_1m = 0
+            atr_val = 0
             if not df1m.empty:
-                atr_1m = ta.volatility.AverageTrueRange(df1m['high'], df1m['low'], df1m['close']).average_true_range().iloc[-1]
+                atr_val = ta.volatility.AverageTrueRange(df1m['high'], df1m['low'], df1m['close']).average_true_range().iloc[-1]
 
             data = {
                 'signal': signal,
                 'direction': direction,
                 'desc': desc,
-                'confidence': confidence,
+                'confidence': int(confidence),
                 'threshold': 72,
                 'expiry_min': expiry,
-                'atr_1m': round(atr_1m, 4),
+                'atr': round(atr_val, 4),
                 'trend': trend,
                 'momentum': momentum,
                 'volatility': volatility,
@@ -204,7 +204,7 @@ class ScreenerHandler:
             df15m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "15m"), manager.loop).result()
             trend, momentum, volatility, structure = self._calculate_scores(symbol, indicators, df15m)
 
-            confidence = 65
+            confidence = 65 if signal != "WAIT" else 0
 
             # 1. Echo Forecast Intelligence
             df15m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "15m"), manager.loop).result()
@@ -213,9 +213,9 @@ class ScreenerHandler:
             if fcast_prices:
                 fcast_final = fcast_prices[-1]
                 if signal == 'BUY' and fcast_final > df15m['close'].iloc[-1]:
-                    confidence += (correlation * 20)
+                    confidence = min(100, confidence + (correlation * 20))
                 elif signal == 'SELL' and fcast_final < df15m['close'].iloc[-1]:
-                    confidence += (correlation * 20)
+                    confidence = min(100, confidence + (correlation * 20))
 
                 fcast_data = {
                     'high': max(fcast_prices), 'low': min(fcast_prices),
@@ -225,18 +225,18 @@ class ScreenerHandler:
 
             expiry = predict_expiry_v5(symbol, 'strategy_6', 1, 15, confidence, fcast_data, df1m, direction=direction)
 
-            atr_1m = 0
+            atr_val = 0
             if not df1m.empty:
-                atr_1m = ta.volatility.AverageTrueRange(df1m['high'], df1m['low'], df1m['close']).average_true_range().iloc[-1]
+                atr_val = ta.volatility.AverageTrueRange(df1m['high'], df1m['low'], df1m['close']).average_true_range().iloc[-1]
 
             data = {
                 'signal': signal,
                 'direction': direction,
                 'desc': desc,
-                'confidence': confidence,
+                'confidence': int(confidence),
                 'threshold': 60,
                 'expiry_min': expiry,
-                'atr_1m': round(atr_1m, 4),
+                'atr': round(atr_val, 4),
                 'trend': trend,
                 'momentum': momentum,
                 'volatility': volatility,

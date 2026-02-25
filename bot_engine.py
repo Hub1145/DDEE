@@ -9,7 +9,7 @@ import websocket
 import pandas as pd
 import numpy as np
 import ta
-from handlers.ta_handler import manager
+from handlers.ta_handler import manager, get_ta_signal
 from handlers.screener_handler import ScreenerHandler
 from handlers.strategy_handler import StrategyHandler
 from handlers.utils import (
@@ -620,25 +620,30 @@ class TradingBotEngine:
             # --- INTELLIGENT POSITION ENGINE v5.0 ---
             strat_key = self.config.get('active_strategy')
 
-            # Expert Intelligent Monitoring for Strategies 5, 6, 7
-            if strat_key in ['strategy_5', 'strategy_6', 'strategy_7']:
-                metrics = self.screener_data.get(symbol, {})
-                current_signal = metrics.get('signal') # 'BUY', 'SELL', 'WAIT'
+            # Expert Intelligent Monitoring for Strategies 1, 2, 3, 5, 6, 7
+            if strat_key in ['strategy_1', 'strategy_2', 'strategy_3', 'strategy_5', 'strategy_6', 'strategy_7']:
+                # 1. Check for Signal Flip (Opposite Direction) on LTF
+                ta_interval = strat['ltf_granularity'] // 60
+                ta_interval_str = f"{ta_interval}m"
+                current_ta = get_ta_signal(symbol, ta_interval_str)
 
-                # Check for Signal Flip (Opposite Direction)
-                opposite_signal = 'SELL' if is_long else 'BUY'
+                opposite_ta = 'SELL' if is_long else 'BUY'
 
-                if current_signal == opposite_signal:
-                    # Signal flipped against us. Expert move: Close early if losing to preserve capital.
-                    if c.get('pnl', 0) < 0:
-                        self.log(f"Intelligent EXIT for {symbol} ({cid}): Signal flip to {current_signal} while losing.")
-                        self._close_contract(cid)
-                        continue
-                    # If profit is positive but signal flipped, maybe we wait for a bit?
-                    # User said: "hold if signal is still in support, if not close".
-                    # Flipped signal is NOT in support.
-                    else:
-                        self.log(f"Intelligent EXIT for {symbol} ({cid}): Signal flip to {current_signal} (Taking profit).")
+                if opposite_ta in current_ta:
+                    # Signal flipped against us on LTF.
+                    self.log(f"Expert EXIT for {symbol} ({cid}): LTF Signal flip to {current_ta}. Closing position.")
+                    self._close_contract(cid)
+                    continue
+
+                # 2. Screener Signal Monitoring (for strategies that use screener)
+                if strat_key in ['strategy_5', 'strategy_6', 'strategy_7']:
+                    metrics = self.screener_data.get(symbol, {})
+                    current_signal = metrics.get('signal') # 'BUY', 'SELL', 'WAIT'
+
+                    opposite_signal = 'SELL' if is_long else 'BUY'
+
+                    if current_signal == opposite_signal:
+                        self.log(f"Intelligent EXIT for {symbol} ({cid}): Screener signal flip to {current_signal}.")
                         self._close_contract(cid)
                         continue
 
@@ -646,26 +651,28 @@ class TradingBotEngine:
                 # If PnL is dropping significantly and signal is neutral, we might consider closing.
 
             if strat_key == 'strategy_1' and current_price:
-                sd = self.symbol_data.get(symbol, {})
-                htf_open = sd.get('htf_open')
-                if htf_open:
-                    # Exit if closed back across Daily Open
-                    if (side == 'long' and current_price < htf_open) or (side == 'short' and current_price > htf_open):
-                        self.log(f"Strategy 1 EXIT for {symbol}: Price crossed back Daily Open.")
-                        self._close_contract(cid)
-                        continue
+                # Intensive exit management ONLY for Multipliers
+                if c.get('contract_type') in ['MULTUP', 'MULTDOWN']:
+                    sd = self.symbol_data.get(symbol, {})
+                    htf_open = sd.get('htf_open')
+                    if htf_open:
+                        # Exit if closed back across Daily Open
+                        if (side == 'long' and current_price < htf_open) or (side == 'short' and current_price > htf_open):
+                            self.log(f"Strategy 1 EXIT (Multi) for {symbol}: Price crossed back Daily Open.")
+                            self._close_contract(cid)
+                            continue
 
-                    # Exit at +2 Daily ATRs
-                    if len(sd.get('daily_candles', [])) >= 14:
-                        df_d = pd.DataFrame(sd['daily_candles'])
-                        daily_atr = ta.volatility.AverageTrueRange(df_d['high'], df_d['low'], df_d['close']).average_true_range().iloc[-1]
-                        entry_p = c.get('entry_price')
-                        if entry_p:
-                            profit_dist = (current_price - entry_p) if is_long else (entry_p - current_price)
-                            if profit_dist > (2 * daily_atr):
-                                self.log(f"Strategy 1 EXIT for {symbol}: +2 Daily ATR target reached.")
-                                self._close_contract(cid)
-                                continue
+                        # Exit at +2 Daily ATRs
+                        if len(sd.get('daily_candles', [])) >= 14:
+                            df_d = pd.DataFrame(sd['daily_candles'])
+                            daily_atr = ta.volatility.AverageTrueRange(df_d['high'], df_d['low'], df_d['close']).average_true_range().iloc[-1]
+                            entry_p = c.get('entry_price')
+                            if entry_p:
+                                profit_dist = (current_price - entry_p) if is_long else (entry_p - current_price)
+                                if profit_dist > (2 * daily_atr):
+                                    self.log(f"Strategy 1 EXIT (Multi) for {symbol}: +2 Daily ATR target reached.")
+                                    self._close_contract(cid)
+                                    continue
 
             if (strat_key in ['strategy_5', 'strategy_6', 'strategy_7']) and current_price:
                 sd = self.symbol_data.get(symbol, {})
@@ -822,6 +829,11 @@ class TradingBotEngine:
             duration_seconds = max(15, next_close_epoch - int(now.timestamp()))
             expiry_label = f"Expiry: {duration_seconds // 60}m {duration_seconds % 60}s"
 
+        elif strat_key == 'strategy_4':
+            # Constant 1-minute expiry
+            duration_seconds = 60
+            expiry_label = "Expiry: 1 minute (Constant)"
+
         elif strat_key in ['strategy_5', 'strategy_6', 'strategy_7']:
             metrics = metadata or self.screener_data.get(symbol, {})
             contract_type = self.config.get('contract_type', 'rise_fall')
@@ -916,31 +928,53 @@ class TradingBotEngine:
         amount = max(0.35, round(amount, 2))
 
         contract_type = self.config.get('contract_type', 'rise_fall')
-        is_multiplier = (strat_key in ['strategy_5', 'strategy_6', 'strategy_7'] and contract_type == 'multiplier')
+        # Strategy 1, 2, 3 now support Multiplier if contract_type is set to 'multiplier'
+        # Strategy 4 is Rise & Fall ONLY (enforced later)
+        is_multiplier = (strat_key != 'strategy_4' and contract_type == 'multiplier')
 
         if is_multiplier:
             # Growth account strategy: 5% of balance or fixed amount
             if not self.config.get('use_fixed_balance'):
                 amount = max(0.35, round(self.account_balance * 0.05, 2))
 
-            # Smart Multiplier tied to Volatility (ATR %)
+            # Smart Multiplier Logic
             metrics = metadata or self.screener_data.get(symbol, {})
             entry_price = sd['last_tick']
-            atr = metrics.get('atr', 1.0)
-            atr_pct = atr / entry_price if entry_price else 0.001
 
-            base_mult = int(self.config.get('multiplier_value', 100))
+            # Get ATR and Confidence for TP/SL and Smart Multiplier
+            atr = metrics.get('atr_1m') or metrics.get('atr') or (entry_price * 0.001 if entry_price else 1.0)
+            confidence = metrics.get('confidence', 50)
+            fcast_data = metrics.get('fcast_data')
+
+            # 1. Tiered Base Multiplier
+            if strat_key == 'strategy_1': base_mult = 50   # Low
+            elif strat_key == 'strategy_2': base_mult = 100 # Medium
+            elif strat_key == 'strategy_3': base_mult = 200 # High
+            else: base_mult = int(self.config.get('multiplier_value', 100))
+
+            # 2. Volatility Scaling
+            atr_pct = atr / entry_price if entry_price else 0.001
             mult_val = get_smart_multiplier(atr_pct, base_mult)
 
-            # Smart TP/SL based on ATR and Confidence
-            confidence = metrics.get('confidence', 50)
-            tp_price, sl_price = get_smart_targets(entry_price, internal_side, atr, confidence)
+            # 3. Liquidation Safety Check (Based on SL Distance)
+            tp_price, sl_price = get_smart_targets(entry_price, internal_side, atr, confidence, fcast_data=fcast_data)
+            if entry_price and sl_price:
+                sl_dist_pct = abs(entry_price - sl_price) / entry_price
+                if sl_dist_pct > 0:
+                    # Max multiplier to avoid liquidation before SL (limit to 80% of liquidation distance)
+                    max_safe_mult = 0.8 / sl_dist_pct
+                    if mult_val > max_safe_mult:
+                        self.log(f"Smart Multiplier: Reducing {mult_val}x to {int(max_safe_mult)}x to prevent liquidation before SL.")
+                        mult_val = int(max_safe_mult)
+
+            # Ensure mult_val is at least a minimum sensible value for the symbol (usually 10x)
+            mult_val = max(10, mult_val)
 
             # Convert targets to USD
-            sl_usd = abs((sl_price - entry_price) / entry_price) * mult_val * amount if entry_price else 0.1 * amount
-            tp_usd = abs((tp_price - entry_price) / entry_price) * mult_val * amount if entry_price else 0.2 * amount
+            sl_usd = abs((sl_price - entry_price) / entry_price) * mult_val * amount if entry_price and sl_price else 0.1 * amount
+            tp_usd = abs((tp_price - entry_price) / entry_price) * mult_val * amount if entry_price and tp_price else 0.2 * amount
 
-            self.log(f"Opening MULTIPLIER {side.upper()} on {symbol} | Stake: {amount} | Smart Mult: {mult_val}x | Confidence: {confidence}%")
+            self.log(f"Opening MULTIPLIER {side.upper()} on {symbol} | Stake: {amount} | Tiered Mult: {mult_val}x | Confidence: {confidence}%")
 
             buy_request = {
                 "buy": 1,
