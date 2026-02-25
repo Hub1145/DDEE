@@ -42,6 +42,11 @@ def update_config():
     global bot_engine
     try:
         new_config = request.json
+        # Basic validation
+        required_top_keys = ['api_accounts', 'is_demo', 'strategy']
+        if not all(k in new_config for k in required_top_keys):
+            return jsonify({'success': False, 'message': 'Missing required configuration keys'}), 400
+
         save_config(new_config)
         if bot_engine:
             bot_engine.apply_live_config_update(new_config)
@@ -54,8 +59,14 @@ def shutdown():
     global bot_engine
     if bot_engine:
         bot_engine.stop()
-    func = request.environ.get('werkzeug.server.shutdown')
-    if func: func()
+
+    def kill_server():
+        import time
+        import signal
+        time.sleep(1)
+        os.kill(os.getpid(), signal.SIGINT)
+
+    threading.Thread(target=kill_server).start()
     return jsonify({'success': True, 'message': 'Server shutting down...'})
 
 @app.route('/api/download_logs')

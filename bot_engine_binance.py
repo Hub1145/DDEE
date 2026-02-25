@@ -148,6 +148,9 @@ class BinanceTradingBotEngine:
 
             self.log(f"Leverage set to {leverage}x, Margin: {margin_type}", account_name=acc['info'].get('name'))
 
+            # Force metrics update to get balance
+            self._update_account_metrics(idx, force=True)
+
             # Initial entry if needed
             self._check_and_place_initial_entry(idx, symbol)
 
@@ -174,25 +177,16 @@ class BinanceTradingBotEngine:
             side = Client.SIDE_BUY if direction == 'LONG' else Client.SIDE_SELL
 
             try:
-                formatted_qty = self._format_quantity(symbol, quantity)
-                formatted_price = self._format_price(symbol, entry_price)
+                order_id = self._place_limit_order(idx, symbol, side, quantity, entry_price)
 
-                order = client.futures_create_order(
-                    symbol=symbol,
-                    side=side,
-                    type=Client.FUTURE_ORDER_TYPE_LIMIT,
-                    timeInForce=Client.TIME_IN_FORCE_GTC,
-                    quantity=formatted_qty,
-                    price=formatted_price
-                )
-
-                with self.data_lock:
-                    if idx not in self.grid_state: self.grid_state[idx] = {}
-                    self.grid_state[idx][symbol] = {
-                        'initial_order_id': order['orderId'],
-                        'initial_filled': False,
-                        'levels': {} # level -> { 'tp_order_id': id, 'buy_back_order_id': id }
-                    }
+                if order_id:
+                    with self.data_lock:
+                        if idx not in self.grid_state: self.grid_state[idx] = {}
+                        self.grid_state[idx][symbol] = {
+                            'initial_order_id': order_id,
+                            'initial_filled': False,
+                            'levels': {} # level -> { 'tp_order_id': id, 'buy_back_order_id': id }
+                        }
 
             except Exception as e:
                 self.log(f"Initial entry placement failed: {e}", 'error', acc['info'].get('name'))
@@ -353,12 +347,12 @@ class BinanceTradingBotEngine:
             self.log(f"Limit order placement failed: {e}", 'error', self.accounts[idx]['info'].get('name'))
             return None
 
-    def _update_account_metrics(self, idx):
+    def _update_account_metrics(self, idx, force=False):
         acc = self.accounts[idx]
         client = acc['client']
         try:
             # Throttle updates
-            if time.time() - acc['last_update'] < 5: return
+            if not force and time.time() - acc['last_update'] < 5: return
             acc['last_update'] = time.time()
 
             account_info = client.futures_account()

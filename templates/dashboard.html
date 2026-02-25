@@ -24,6 +24,7 @@
             color: var(--text-color);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             margin: 0;
+            overflow-x: hidden;
         }
 
         .navbar {
@@ -110,6 +111,35 @@
         .stat-value {
             font-size: 1.25rem;
             font-weight: 700;
+        }
+
+        @media (max-width: 768px) {
+            .stat-value {
+                font-size: 1.1rem;
+            }
+            .stat-card {
+                padding: 10px;
+            }
+            .section-title {
+                font-size: 0.85rem;
+            }
+            .ring-container {
+                width: 80px;
+                height: 80px;
+                margin-bottom: 10px;
+            }
+            .ring-container svg {
+                width: 80px;
+                height: 80px;
+            }
+            .ring-container circle {
+                cx: 40;
+                cy: 40;
+                r: 32;
+            }
+            .navbar-brand {
+                font-size: 1rem !important;
+            }
         }
 
         .status-badge {
@@ -224,22 +254,25 @@
     </style>
 </head>
 <body>
-    <nav class="navbar d-flex justify-content-between">
-        <div class="d-flex align-items-center">
-            <span class="fs-5 fw-bold"><i class="bi bi-currency-bitcoin text-warning"></i> Binance Scaler</span>
-            <span class="badge bg-secondary ms-2 status-badge" id="botStatus">Stopped</span>
-            <span class="badge bg-info ms-1 status-badge" id="demoBadge">Demo</span>
-        </div>
-        <div class="d-flex gap-2">
-            <button class="btn btn-sm btn-accent" id="startStopBtn"><i class="bi bi-play-fill"></i> Start</button>
-            <button class="btn btn-sm btn-outline-secondary" id="configBtn"><i class="bi bi-gear-fill"></i> Config</button>
+    <nav class="navbar navbar-expand-md">
+        <div class="container-fluid px-0">
+            <div class="navbar-brand d-flex align-items-center me-auto">
+                <span class="fs-5 fw-bold"><i class="bi bi-currency-bitcoin text-warning"></i> Binance Scaler</span>
+                <span class="badge bg-secondary ms-2 status-badge d-none d-sm-inline" id="botStatus">Stopped</span>
+                <span class="badge bg-info ms-1 status-badge d-none d-sm-inline" id="demoBadge">Demo</span>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-accent" id="startStopBtn"><i class="bi bi-play-fill"></i> Start</button>
+                <button class="btn btn-sm btn-outline-secondary" id="configBtn"><i class="bi bi-gear-fill"></i> Config</button>
+            </div>
         </div>
     </nav>
 
-    <div class="container-fluid p-3">
-        <div class="row g-3">
+    <div class="container-fluid p-2 p-md-3">
+        <div class="row g-2 g-md-3">
             <!-- Left Side: Inputs (Style Replicated) -->
-            <div class="col-md-4">
+            <div class="col-12 col-md-6 col-lg-4">
                 <div class="card p-3">
                     <div class="section-title">
                         <span>Units</span>
@@ -296,9 +329,9 @@
             </div>
 
             <!-- Middle: Take Profit & Dashboard -->
-            <div class="col-md-5">
-                <div class="card p-3">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="col-12 col-md-6 col-lg-5">
+                <div class="card p-2 p-md-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2 mb-md-3">
                         <span class="fw-bold">Take Profit</span>
                         <label class="switch-toggle">
                             <input type="checkbox" checked id="tpToggle">
@@ -311,8 +344,8 @@
                     </div>
                     <div class="text-center small text-muted mb-3">The order will be placed on the exchange order book beforehand</div>
 
-                    <div class="row align-items-center">
-                        <div class="col-4">
+                    <div class="row align-items-center g-2">
+                        <div class="col-12 col-sm-4 text-center">
                             <div class="ring-container mx-auto">
                                 <svg width="100" height="100">
                                     <circle cx="50" cy="50" r="40" stroke="#2b3139" stroke-width="8" fill="transparent" />
@@ -323,7 +356,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-8">
+                        <div class="col-12 col-sm-8">
                             <div class="d-flex justify-content-between small text-muted px-2 mb-1">
                                 <span>Percent</span>
                                 <span>Quantity</span>
@@ -361,7 +394,7 @@
             </div>
 
             <!-- Right Side: Stats & Symbols -->
-            <div class="col-md-3">
+            <div class="col-12 col-md-12 col-lg-3">
                 <div class="card">
                     <div class="card-header">Account Summary</div>
                     <div class="card-body p-0">
