@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from handlers.utils import (
     calculate_supertrend, detect_macd_divergence, check_price_action_patterns,
     score_reversal_pattern, calculate_snr_zones, calculate_echo_forecast,
-    calculate_5m_snr_v5
+    calculate_5m_snr_v5, calculate_structural_rr
 )
 from handlers.ta_handler import get_ta_signal
 
@@ -94,6 +94,24 @@ class StrategyHandler:
         if signal not in ['BUY', 'SELL']:
             return
 
+        # v5.3 Structural RR & Echo Confirmation
+        fcast_data = data.get('fcast_data')
+        if fcast_data and 'forecast_prices' in fcast_data:
+            last_price = sd.get('last_tick')
+            proj_price = fcast_data['forecast_prices'][-1]
+
+            # 1. Echo Confirmation: Forecast must agree with signal direction
+            if signal == 'BUY' and proj_price <= last_price:
+                return
+            if signal == 'SELL' and proj_price >= last_price:
+                return
+
+            # 2. Structural RR Gatekeeper (Using ATR as risk floor)
+            atr = data.get('atr', 0)
+            rr = calculate_structural_rr(last_price, fcast_data['forecast_prices'], signal, atr)
+            if rr < 1.5:
+                # If RR is low, wait for a pullback or better setup
+                return
 
         # Check if already in position for this symbol
         for cid, c in self.bot.contracts.items():
@@ -151,7 +169,7 @@ class StrategyHandler:
                 elif last_price >= htf_open and current_price < htf_open:
                     is_cross_down = True
 
-        # Echo Forecast Confirmation
+        # Echo Forecast Confirmation & Structural RR Gatekeeper
         echo_confirmed = False
         ltf_df = pd.DataFrame(sd.get('ltf_candles', []))
         if not ltf_df.empty:
@@ -159,9 +177,14 @@ class StrategyHandler:
             if fcast_prices and correlation > 0.5:
                 fcast_final = fcast_prices[-1]
 
-                if is_cross_up and fcast_final > current_price:
+                # Get ATR for risk floor
+                atr = ta.volatility.average_true_range(ltf_df['high'], ltf_df['low'], ltf_df['close'], window=14).iloc[-1]
+                direction = "BUY" if is_cross_up else "SELL"
+                rr = calculate_structural_rr(current_price, fcast_prices, direction, atr)
+
+                if is_cross_up and fcast_final > current_price and rr >= 1.5:
                     echo_confirmed = True
-                elif is_cross_down and fcast_final < current_price:
+                elif is_cross_down and fcast_final < current_price and rr >= 1.5:
                     echo_confirmed = True
 
         # Signal Filtering (Prioritize standard BUY/SELL over STRONG signals for crossovers)
@@ -234,6 +257,22 @@ class StrategyHandler:
                         if pa_pattern and any(p in pa_pattern for p in ['bearish', 'pin', 'doji', 'top']):
                             signal = 'sell'
                             break
+
+        # Strategy 4 Echo & Structural RR confirmation
+        if signal:
+            ltf_df = pd.DataFrame(sd.get('ltf_candles', []))
+            if not ltf_df.empty:
+                fcast_prices, correlation = calculate_echo_forecast(ltf_df)
+                if fcast_prices and correlation > 0.5:
+                    atr = ta.volatility.average_true_range(ltf_df['high'], ltf_df['low'], ltf_df['close'], window=14).iloc[-1]
+                    rr = calculate_structural_rr(current_price, fcast_prices, signal, atr)
+
+                    if signal == 'buy':
+                        if fcast_prices[-1] <= current_price or rr < 1.5:
+                            signal = None
+                    elif signal == 'sell':
+                        if fcast_prices[-1] >= current_price or rr < 1.5:
+                            signal = None
 
         if signal:
             self.bot.log(f"Strategy 4 [SNR v5] triggered {signal} for {symbol} at zone {z['type']}. TA: {ta_signal}, PA: {pa_pattern}")

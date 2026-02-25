@@ -10,8 +10,8 @@ A high-performance, modular trading bot designed for Deriv Volatility Indices. T
 - **Structural RR Gatekeeper**: All entries require a projected Reward/Risk ratio of ≥ 1.5 based on the forecasted structural path, filtered through an ATR-based risk floor.
 - **Smart Expiry (Target Arrival)**: Dynamically calculates optimal trade duration by pinpointing the exact future candle where price is projected to reach its ATR target within the Echo window.
 - **Smart & Tiered Multipliers**:
-    - **Tiered Base Levels**: Strategy 1 (50x), Strategy 2 (100x), Strategy 3 (200x).
-    - **Volatility Scaling**: Multipliers automatically scale based on relative volatility (ATR % of price).
+    - **Direct Tiered Mapping**: Strategy 1 (Lowest available), Strategy 2 (Middle available), Strategy 3 (Highest available). Ensuring consistent risk-to-reward profiling for each strategy tier.
+    - **Volatility Scaling**: Multipliers for other strategies automatically scale based on relative volatility (ATR % of price).
     - **Liquidation Protection**: Automatically reduces multiplier values if the Stop Loss is too close to the liquidation point.
 
 ### 🏗 Modular Architecture
@@ -49,11 +49,11 @@ A high-performance, modular trading bot designed for Deriv Volatility Indices. T
 
 ### 🔹 Strategy 4: LuxAlgo SNR (Rise & Fall ONLY)
 - **Concept**: Pure structural reversal trading.
-- **Entry**: Price enters a **5m Pivot Zone**. Requires **1m Bullish/Bearish Reversal** (TA + PA Pattern).
-- **Exit**: Constant **1-minute expiry** for precision scalping.
+- **Entry**: Price enters a **5m Pivot Zone**. Requires **1m Bullish/Bearish Reversal** (TA + PA Pattern) and **Echo Forecast** confirmation.
+- **Exit**: Constant **5-minute expiry** for optimal zone absorption.
 
 ### 🔹 Strategy 5: Synthetic Intelligence Screener
-- **Concept**: Weighted multi-pillar decision engine.
+- **Concept**: Weighted multi-pillar decision engine. Requires **Echo Forecast** directional agreement.
 - **Architecture**:
     - **Trend**: EMA 50/200, SuperTrend, ADX.
     - **Momentum**: RSI, Stoch RSI, MACD Divergence.
@@ -63,7 +63,7 @@ A high-performance, modular trading bot designed for Deriv Volatility Indices. T
 - **Adaptive Sensitivity**: Increases confidence thresholds (+5%) following 3+ consecutive losses on a symbol.
 
 ### 🔹 Strategy 6: Intelligence Legacy
-- **Concept**: Exhaustive suite of 20+ indicators with weighted importance.
+- **Concept**: Exhaustive suite of 20+ indicators with weighted importance. Requires **Echo Forecast** directional agreement.
 - **Indicator Blocks**: Trend (W3), Momentum (W2), Volatility (W1), Structure (W2).
 - **Execution**: Confidence >= 60% across Core (1H), Timing (1m), and Bias (4H) alignment.
 

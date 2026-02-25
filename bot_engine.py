@@ -835,9 +835,9 @@ class TradingBotEngine:
             expiry_label = f"Expiry: {duration_seconds // 60}m {duration_seconds % 60}s"
 
         elif strat_key == 'strategy_4':
-            # Constant 1-minute expiry
-            duration_seconds = 60
-            expiry_label = "Expiry: 1 minute (Constant)"
+            # Constant 5-minute expiry
+            duration_seconds = 300
+            expiry_label = "Expiry: 5 minutes (Constant)"
 
         elif strat_key in ['strategy_5', 'strategy_6', 'strategy_7']:
             metrics = metadata or self.screener_data.get(symbol, {})
@@ -951,49 +951,66 @@ class TradingBotEngine:
             confidence = metrics.get('confidence', 50)
             fcast_data = metrics.get('fcast_data')
 
-            # 1. Tiered Base Multiplier
-            if strat_key == 'strategy_1': base_mult = 50   # Low
-            elif strat_key == 'strategy_2': base_mult = 100 # Medium
-            elif strat_key == 'strategy_3': base_mult = 200 # High
-            else: base_mult = int(self.config.get('multiplier_value', 100))
-
-            # 2. Volatility Scaling
-            atr_pct = atr / entry_price if entry_price else 0.001
-            mult_val = get_smart_multiplier(atr_pct, base_mult)
-
-            # 3. Liquidation Safety Check (Based on SL Distance)
-            tp_price, sl_price = get_smart_targets(entry_price, internal_side, atr, confidence, fcast_data=fcast_data)
-            if entry_price and sl_price:
-                sl_dist_pct = abs(entry_price - sl_price) / entry_price
-                if sl_dist_pct > 0:
-                    # Max multiplier to avoid liquidation before SL (limit to 80% of liquidation distance)
-                    max_safe_mult = 0.8 / sl_dist_pct
-                    if mult_val > max_safe_mult:
-                        self.log(f"Smart Multiplier: Reducing {mult_val}x to {int(max_safe_mult)}x to prevent liquidation before SL.")
-                        mult_val = int(max_safe_mult)
-
-            # Ensure mult_val is at least a minimum sensible value for the symbol (usually 10x)
-            mult_val = max(10, mult_val)
-
-            # 4. Match with AVAILABLE multipliers for the symbol
+            # 1. Tiered Multiplier Selection (Direct mapping for 1, 2, 3 as requested)
             available = sd.get('available_multipliers', [])
-            if available:
-                # Find the largest available multiplier that is <= mult_val
-                best_match = None
-                sorted_avail = sorted(available)
-                for a in sorted_avail:
-                    if a <= mult_val:
-                        best_match = a
-                    else:
-                        break
 
-                if best_match is None:
-                    # mult_val is smaller than any available. Use smallest available.
-                    best_match = sorted_avail[0]
+            # We need tp_price and sl_price for both paths to calculate limit orders
+            tp_price, sl_price = get_smart_targets(entry_price, internal_side, atr, confidence, fcast_data=fcast_data)
 
-                if best_match != mult_val:
-                    self.log(f"Expert Multiplier: Adjusting {mult_val}x to nearest available {best_match}x for {symbol}.")
-                mult_val = best_match
+            if strat_key in ['strategy_1', 'strategy_2', 'strategy_3'] and available:
+                sorted_avail = sorted([int(m) for m in available])
+                mid_idx = len(sorted_avail) // 2
+
+                if strat_key == 'strategy_1':
+                    mult_val = sorted_avail[0] # Low number below middle
+                elif strat_key == 'strategy_2':
+                    mult_val = sorted_avail[mid_idx] # Middle
+                elif strat_key == 'strategy_3':
+                    mult_val = sorted_avail[-1] # Highest above middle
+
+                self.log(f"Tiered Multiplier for {strat_key}: Selected {mult_val}x from available {sorted_avail}")
+            else:
+                # Smart Multiplier Logic for other strategies or if available list is missing
+                if strat_key == 'strategy_1': base_mult = 50
+                elif strat_key == 'strategy_2': base_mult = 100
+                elif strat_key == 'strategy_3': base_mult = 250
+                else: base_mult = int(self.config.get('multiplier_value', 100))
+
+                # 2. Volatility Scaling
+                atr_pct = atr / entry_price if entry_price else 0.001
+                mult_val = get_smart_multiplier(atr_pct, base_mult)
+
+                # 3. Liquidation Safety Check (Based on SL Distance)
+                if entry_price and sl_price:
+                    sl_dist_pct = abs(entry_price - sl_price) / entry_price
+                    if sl_dist_pct > 0:
+                        # Max multiplier to avoid liquidation before SL (limit to 80% of liquidation distance)
+                        max_safe_mult = 0.8 / sl_dist_pct
+                        if mult_val > max_safe_mult:
+                            self.log(f"Smart Multiplier: Reducing {mult_val}x to {int(max_safe_mult)}x to prevent liquidation before SL.")
+                            mult_val = int(max_safe_mult)
+
+                # Ensure mult_val is at least a minimum sensible value for the symbol (usually 10x)
+                mult_val = max(10, mult_val)
+
+                # 4. Match with AVAILABLE multipliers for the symbol
+                if available:
+                    # Find the largest available multiplier that is <= mult_val
+                    best_match = None
+                    sorted_avail = sorted([int(m) for m in available])
+                    for a in sorted_avail:
+                        if a <= mult_val:
+                            best_match = a
+                        else:
+                            break
+
+                    if best_match is None:
+                        # mult_val is smaller than any available. Use smallest available.
+                        best_match = sorted_avail[0]
+
+                    if best_match != mult_val:
+                        self.log(f"Expert Multiplier: Adjusting {mult_val}x to nearest available {best_match}x for {symbol}.")
+                    mult_val = best_match
 
             # Convert targets to USD
             sl_usd = abs((sl_price - entry_price) / entry_price) * mult_val * amount if entry_price and sl_price else 0.1 * amount

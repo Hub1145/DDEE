@@ -1,0 +1,21 @@
+2026-02-25 18:28:07,007 - INFO - Bot started | Trading: OFF
+2026-02-25 18:28:07,008 - INFO - Screener background loop started
+2026-02-25 18:28:07,011 - INFO - History worker started
+2026-02-25 18:28:07,011 - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+ * Serving Flask app 'app'
+ * Debug mode: off
+2026-02-25 18:28:07,017 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.0.2:3000
+2026-02-25 18:28:07,017 - INFO - [33mPress CTRL+C to quit[0m
+2026-02-25 18:32:45,622 - INFO - 127.0.0.1 - - [25/Feb/2026 18:32:45] "GET / HTTP/1.1" 200 -
+2026-02-25 18:32:45,675 - INFO - 127.0.0.1 - - [25/Feb/2026 18:32:45] "GET /static/js/app.js HTTP/1.1" 200 -
+2026-02-25 18:32:45,925 - INFO - 127.0.0.1 - - [25/Feb/2026 18:32:45] "GET /socket.io/?EIO=4&transport=polling&t=PoM4p1H HTTP/1.1" 200 -
+2026-02-25 18:32:45,935 - INFO - 127.0.0.1 - - [25/Feb/2026 18:32:45] "GET /api/config HTTP/1.1" 200 -
+2026-02-25 18:32:45,948 - INFO - Client connected: TrBt5jpBi9VwlRnDAAAB
+2026-02-25 18:32:45,950 - INFO - 127.0.0.1 - - [25/Feb/2026 18:32:45] "POST /socket.io/?EIO=4&transport=polling&t=PoM4p1o&sid=8Nn_hWKF0Das21glAAAA HTTP/1.1" 200 -
+2026-02-25 18:32:45,966 - INFO - 127.0.0.1 - - [25/Feb/2026 18:32:45] "GET /socket.io/?EIO=4&transport=polling&t=PoM4p1u&sid=8Nn_hWKF0Das21glAAAA HTTP/1.1" 200 -
+2026-02-25 18:32:45,982 - INFO - 127.0.0.1 - - [25/Feb/2026 18:32:45] "GET /socket.io/?EIO=4&transport=polling&t=PoM4p2Q&sid=8Nn_hWKF0Das21glAAAA HTTP/1.1" 200 -
+2026-02-25 18:32:53,400 - INFO - Client disconnected
+2026-02-25 18:32:53,401 - INFO - 127.0.0.1 - - [25/Feb/2026 18:32:53] "GET /socket.io/?EIO=4&transport=websocket&sid=8Nn_hWKF0Das21glAAAA HTTP/1.1" 200 -
