@@ -8,7 +8,8 @@ from concurrent.futures import ThreadPoolExecutor
 from handlers.ta_handler import get_ta_signal, get_ta_indicators, fetch_candles, manager
 from handlers.utils import (
     calculate_snr_zones, check_price_action_patterns, score_reversal_pattern,
-    predict_expiry_v5, calculate_echo_forecast
+    predict_expiry_v5, calculate_echo_forecast, calculate_structural_rr, get_smart_targets,
+    calculate_supertrend, calculate_fractals, calculate_order_blocks, detect_macd_divergence
 )
 
 class ScreenerHandler:
@@ -100,74 +101,126 @@ class ScreenerHandler:
             return 0, 0, 0, 0
 
     def analyze_strategy_5(self, symbol):
-        """Strategy 5: Triple EMA Alignment (1m, 5m, 1h)"""
+        """Strategy 5: Synthetic Intelligence Screener (v5.3)"""
         try:
-            loop = manager.loop
-            if loop is None or not loop.is_running():
-                return None
-            rec1m = get_ta_signal(symbol, "1m")
-            rec5m = get_ta_signal(symbol, "5m")
-            rec1h = get_ta_signal(symbol, "1h")
-
-            signal = "WAIT"
-            direction = "NEUTRAL"
-            desc = "No alignment"
-
-            if "BUY" in rec1m and "BUY" in rec5m and "BUY" in rec1h:
-                signal = "BUY"
-                direction = "CALL"
-                desc = "Triple EMA Alignment UP"
-            elif "SELL" in rec1m and "SELL" in rec5m and "SELL" in rec1h:
-                signal = "SELL"
-                direction = "PUT"
-                desc = "Triple EMA Alignment DOWN"
-
+            # 1. Gather Data across multiple timeframes
             df1m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1m"), manager.loop).result()
-
-            indicators = get_ta_indicators(symbol, "5m")
             df5m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "5m"), manager.loop).result()
-            trend, momentum, volatility, structure = self._calculate_scores(symbol, indicators, df5m)
+            df1h = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1h"), manager.loop).result()
 
-            confidence = 75 if signal != "WAIT" else 0
+            if df1m.empty or df5m.empty or df1h.empty: return None
 
-            # 1. Echo Forecast Intelligence
+            # Trend Block: EMA 50/200, SuperTrend, ADX
+            ind1h = get_ta_indicators(symbol, "1h")
+            ema50_1h = ind1h.get('ema50', 0)
+            ema200_1h = ind1h.get('ema200', 0)
+            adx_1h = ind1h.get('adx', 0)
+            price_1h = ind1h.get('close', 0)
+
+            st_val, st_dir = calculate_supertrend(df1h)
+            st_curr = st_dir.iloc[-1] # 1 for UP, -1 for DOWN
+
+            trend_score = 0
+            if ema50_1h and ema200_1h:
+                if price_1h > ema50_1h > ema200_1h: trend_score += 30
+                elif price_1h < ema50_1h < ema200_1h: trend_score -= 30
+
+            if st_curr == 1: trend_score += 10
+            else: trend_score -= 10
+
+            if adx_1h > 25: trend_score *= 1.2 # Strength boost
+
+            # Momentum Block: RSI, Stoch RSI, MACD Divergence
+            ind5m = get_ta_indicators(symbol, "5m")
+            rsi_5m = ind5m.get('rsi', 50)
+            stoch_k_5m = ind5m.get('stoch_k', 50)
+            macd_div = detect_macd_divergence(df5m)
+
+            mom_score = 0
+            if rsi_5m > 50: mom_score += 10
+            else: mom_score -= 10
+
+            if stoch_k_5m > 50: mom_score += 10
+            else: mom_score -= 10
+
+            if macd_div == 1: mom_score += 15
+            elif macd_div == -1: mom_score -= 15
+
+            # Volatility Block: ATR, Bollinger Bands
+            bb_h = ind5m.get('bb_h', 0)
+            bb_l = ind5m.get('bb_l', 0)
+            vol_score = 0
+            if price_1h > bb_h: vol_score += 5
+            elif price_1h < bb_l: vol_score -= 5
+
+            # Structure Block: 5m Fractals (Scalp) or 1H Order Blocks (Multiplier)
+            is_multiplier = self.bot.config.get('contract_type') == 'multiplier'
+            struct_score = 0
+            if is_multiplier:
+                obs = calculate_order_blocks(df1h)
+                for ob in obs:
+                    if ob['type'] == 'Bullish OB' and abs(price_1h - ob['price'])/ob['price'] < 0.005:
+                        struct_score += 20
+                    elif ob['type'] == 'Bearish OB' and abs(price_1h - ob['price'])/ob['price'] < 0.005:
+                        struct_score -= 20
+            else:
+                f_high, f_low = calculate_fractals(df5m)
+                if f_low.iloc[-1]: struct_score += 15
+                elif f_high.iloc[-1]: struct_score -= 15
+
+            # Total Confidence Calculation
+            total_raw = trend_score + mom_score + vol_score + struct_score
+            confidence = min(100, abs(total_raw))
+            direction = "CALL" if total_raw > 0 else "PUT"
+            signal = "WAIT"
+
+            # Adaptive Sensitivity
+            sd = self.bot.symbol_data.get(symbol, {})
+            loss_streak = sd.get('consecutive_losses', 0)
+
+            threshold = 68 if is_multiplier else 72
+            if loss_streak >= 3:
+                threshold += (loss_streak - 2) * 5
+                self.bot.log(f"Adaptive Sensitivity: Boosting Strategy 5 threshold to {threshold}% for {symbol} due to {loss_streak} losses.")
+
+            if confidence >= threshold:
+                signal = "BUY" if total_raw > 0 else "SELL"
+
+            # 5. Echo Forecast (5m) validation
             fcast_prices, correlation = calculate_echo_forecast(df5m)
             fcast_data = {}
             if fcast_prices:
-                fcast_high = max(fcast_prices)
-                fcast_low = min(fcast_prices)
                 fcast_final = fcast_prices[-1]
-
-                # Boost confidence if Echo agrees with Signal
-                if signal == 'BUY' and fcast_final > df5m['close'].iloc[-1]:
-                    confidence = min(100, confidence + (correlation * 15))
-                elif signal == 'SELL' and fcast_final < df5m['close'].iloc[-1]:
-                    confidence = min(100, confidence + (correlation * 15))
+                if signal == "BUY" and fcast_final <= df5m['close'].iloc[-1]:
+                    signal = "WAIT"
+                elif signal == "SELL" and fcast_final >= df5m['close'].iloc[-1]:
+                    signal = "WAIT"
 
                 fcast_data = {
-                    'high': fcast_high, 'low': fcast_low, 'final': fcast_final,
-                    'correlation': correlation,
-                    'forecast_prices': fcast_prices
+                    'final': fcast_final, 'correlation': correlation,
+                    'forecast_prices': fcast_prices,
+                    'high': max(fcast_prices), 'low': min(fcast_prices)
                 }
 
+            atr_val = ta.volatility.AverageTrueRange(df5m['high'], df5m['low'], df5m['close']).average_true_range().iloc[-1]
             expiry = predict_expiry_v5(symbol, 'strategy_5', 1, 60, confidence, fcast_data, df1m, direction=direction)
 
-            atr_val = 0
-            if not df1m.empty:
-                atr_val = ta.volatility.AverageTrueRange(df1m['high'], df1m['low'], df1m['close']).average_true_range().iloc[-1]
+            tp_price, sl_price, rr = None, None, 0
+            if signal != "WAIT":
+                tp_price, sl_price = get_smart_targets(df1m['close'].iloc[-1], 'long' if signal == "BUY" else 'short', atr_val, confidence, fcast_data)
+                rr = calculate_structural_rr(df1m['close'].iloc[-1], fcast_prices, signal, atr_val)
 
             data = {
+                'tp': round(tp_price, 4) if tp_price else None,
+                'sl': round(sl_price, 4) if sl_price else None,
+                'rr': round(float(rr), 1),
                 'signal': signal,
                 'direction': direction,
-                'desc': desc,
                 'confidence': round(float(confidence), 1),
-                'threshold': 72,
+                'threshold': threshold,
                 'expiry_min': expiry,
                 'atr': round(atr_val, 4),
-                'trend': trend,
-                'momentum': momentum,
-                'volatility': volatility,
-                'structure': structure,
+                'trend': trend_score, 'momentum': mom_score, 'volatility': vol_score, 'structure': struct_score,
                 'fcast_data': fcast_data,
                 'last_update': time.time()
             }
@@ -179,70 +232,90 @@ class ScreenerHandler:
             return None
 
     def analyze_strategy_6(self, symbol):
-        """Strategy 6: RSI OS/OB (1m) + 15m Trend"""
+        """Strategy 6: Intelligence Legacy (v5.3)"""
         try:
-            rec15m = get_ta_signal(symbol, "15m")
-            indicators1m = get_ta_indicators(symbol, "1m")
-            rsi = indicators1m.get('rsi', 50)
-
-            signal = "WAIT"
-            direction = "NEUTRAL"
-            desc = f"RSI: {rsi:.1f}, Trend: {rec15m}"
-
-            if rsi < 30 and "BUY" in rec15m:
-                signal = "BUY"
-                direction = "CALL"
-                desc = "RSI Oversold + Bullish Trend"
-            elif rsi > 70 and "SELL" in rec15m:
-                signal = "SELL"
-                direction = "PUT"
-                desc = "RSI Overbought + Bearish Trend"
-
+            # 1. Gather Data (1m, 1h, 4h)
             df1m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1m"), manager.loop).result()
+            df1h = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1h"), manager.loop).result()
+            df4h = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "4h"), manager.loop).result()
 
-            indicators = get_ta_indicators(symbol, "15m")
-            df15m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "15m"), manager.loop).result()
-            trend, momentum, volatility, structure = self._calculate_scores(symbol, indicators, df15m)
+            if df1m.empty or df1h.empty or df4h.empty: return None
 
-            confidence = 65 if signal != "WAIT" else 0
+            # Indicator Blocks with Weights: Trend (3), Momentum (2), Volatility (1), Structure (2)
+            ind1h = get_ta_indicators(symbol, "1h")
+            ind1m = get_ta_indicators(symbol, "1m")
+            ind4h = get_ta_indicators(symbol, "4h")
 
-            # 1. Echo Forecast Intelligence
-            df15m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "15m"), manager.loop).result()
-            fcast_prices, correlation = calculate_echo_forecast(df15m)
+            # Trend Score (Weight 3)
+            trend_score = 0
+            if ind1h.get('close') > ind1h.get('ema50'): trend_score += 1
+            else: trend_score -= 1
+            if ind4h.get('close') > ind4h.get('ema50'): trend_score += 1
+            else: trend_score -= 1
+            if ind1m.get('close') > ind1m.get('ema50'): trend_score += 1
+            else: trend_score -= 1
+            trend_final = trend_score * 3
+
+            # Momentum Score (Weight 2)
+            mom_score = 0
+            if ind1h.get('rsi') > 50: mom_score += 1
+            else: mom_score -= 1
+            if ind1m.get('rsi') > 50: mom_score += 1
+            else: mom_score -= 1
+            mom_final = mom_score * 2
+
+            # Volatility Score (Weight 1)
+            vol_score = 0
+            if ind1m.get('close') > ind1m.get('bb_h'): vol_score += 1
+            elif ind1m.get('close') < ind1m.get('bb_l'): vol_score -= 1
+            vol_final = vol_score * 1
+
+            # Structure Score (Weight 2)
+            struct_score = 0
+            macd_div = detect_macd_divergence(df1h)
+            if macd_div == 1: struct_score += 1
+            elif macd_div == -1: struct_score -= 1
+            struct_final = struct_score * 2
+
+            # Normalize confidence (max possible absolute score is 3*3 + 2*2 + 1*1 + 1*2 = 9 + 4 + 1 + 2 = 16)
+            total_score = trend_final + mom_final + vol_final + struct_final
+            confidence = min(100, abs(total_score) / 16 * 100)
+
+            direction = "CALL" if total_score > 0 else "PUT"
+            signal = "WAIT"
+            if confidence >= 60:
+                signal = "BUY" if total_score > 0 else "SELL"
+
+            # Echo Forecast validation
+            fcast_prices, correlation = calculate_echo_forecast(df1h)
             fcast_data = {}
             if fcast_prices:
                 fcast_final = fcast_prices[-1]
-                if signal == 'BUY' and fcast_final > df15m['close'].iloc[-1]:
-                    confidence = min(100, confidence + (correlation * 20))
-                elif signal == 'SELL' and fcast_final < df15m['close'].iloc[-1]:
-                    confidence = min(100, confidence + (correlation * 20))
+                if signal == "BUY" and fcast_final <= df1h['close'].iloc[-1]:
+                    signal = "WAIT"
+                elif signal == "SELL" and fcast_final >= df1h['close'].iloc[-1]:
+                    signal = "WAIT"
+                fcast_data = {'final': fcast_final, 'correlation': correlation, 'forecast_prices': fcast_prices}
 
-                fcast_data = {
-                    'high': max(fcast_prices), 'low': min(fcast_prices),
-                    'final': fcast_final, 'correlation': correlation,
-                    'forecast_prices': fcast_prices
-                }
-
+            atr_val = ta.volatility.AverageTrueRange(df1h['high'], df1h['low'], df1h['close']).average_true_range().iloc[-1]
             expiry = predict_expiry_v5(symbol, 'strategy_6', 1, 15, confidence, fcast_data, df1m, direction=direction)
 
-            atr_val = 0
-            if not df1m.empty:
-                atr_val = ta.volatility.AverageTrueRange(df1m['high'], df1m['low'], df1m['close']).average_true_range().iloc[-1]
+            tp_price, sl_price, rr = None, None, 0
+            if signal != "WAIT":
+                tp_price, sl_price = get_smart_targets(df1m['close'].iloc[-1], 'long' if signal == "BUY" else 'short', atr_val, confidence, fcast_data)
+                rr = calculate_structural_rr(df1m['close'].iloc[-1], fcast_prices, signal, atr_val)
 
             data = {
+                'tp': round(tp_price, 4) if tp_price else None,
+                'sl': round(sl_price, 4) if sl_price else None,
+                'rr': round(float(rr), 1),
                 'signal': signal,
                 'direction': direction,
-                'desc': desc,
                 'confidence': round(float(confidence), 1),
                 'threshold': 60,
                 'expiry_min': expiry,
                 'atr': round(atr_val, 4),
-                'trend': trend,
-                'momentum': momentum,
-                'volatility': volatility,
-                'structure': structure,
-                'rsi': round(rsi, 2),
-                'trend_rec': rec15m,
+                'trend': trend_final, 'momentum': mom_final, 'volatility': vol_final, 'structure': struct_final,
                 'fcast_data': fcast_data,
                 'last_update': time.time()
             }
@@ -347,10 +420,18 @@ class ScreenerHandler:
             expiry = predict_expiry_v5(symbol, 'strategy_7', 1, 60, confidence, fcast_data, df_ltf, direction=direction)
 
             atr_val = 0
+            tp_price, sl_price, rr = None, None, 0
             if not df_ref.empty:
                 atr_val = ta.volatility.AverageTrueRange(df_ref['high'], df_ref['low'], df_ref['close']).average_true_range().iloc[-1]
+                price = df_ref['close'].iloc[-1]
+                if signal != "WAIT":
+                    tp_price, sl_price = get_smart_targets(price, 'long' if signal == 'BUY' else 'short', atr_val, confidence, fcast_data)
+                    rr = calculate_structural_rr(price, fcast_data.get('forecast_prices', []), signal, atr_val)
 
             data = {
+                'tp': round(tp_price, 4) if tp_price else None,
+                'sl': round(sl_price, 4) if sl_price else None,
+                'rr': round(float(rr), 1),
                 'confidence': round(float(confidence), 1),
                 'label': label,
                 'direction': direction,

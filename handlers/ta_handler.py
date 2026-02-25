@@ -6,6 +6,7 @@ import threading
 import numpy as np
 import pandas as pd
 import websockets
+import ta
 from dataclasses import dataclass, field
 from typing import Optional, Dict
 
@@ -103,24 +104,39 @@ def _compute_analysis(df: pd.DataFrame, symbol: str, interval_name: str) -> Anal
     low = df["low"]
     price = close.iloc[-1]
 
-    # Indicators
-    rsi_val = _rsi(close).iloc[-1]
-    stoch_k, _ = _stoch(high, low, close)
-    macd_l, macd_s, _ = _macd(close)
-    ema20 = _ema(close, 20).iloc[-1]
-    ema50 = _ema(close, 50).iloc[-1]
-    sma200 = _sma(close, 200).iloc[-1]
+    # Indicators via 'ta' library for consistency
+    rsi_val = ta.momentum.RSIIndicator(close).rsi().iloc[-1]
+
+    stoch = ta.momentum.StochasticOscillator(high, low, close)
+    stoch_k = stoch.stoch().iloc[-1]
+    stoch_d = stoch.stoch_signal().iloc[-1]
+
+    macd = ta.trend.MACD(close)
+    macd_l = macd.macd().iloc[-1]
+    macd_s = macd.macd_signal().iloc[-1]
+
+    adx = ta.trend.ADXIndicator(high, low, close).adx().iloc[-1]
+
+    bb = ta.volatility.BollingerBands(close)
+    bb_h = bb.bollinger_hband().iloc[-1]
+    bb_l = bb.bollinger_lband().iloc[-1]
+
+    ema20 = ta.trend.ema_indicator(close, 20).iloc[-1]
+    ema50 = ta.trend.ema_indicator(close, 50).iloc[-1]
+    ema200 = ta.trend.ema_indicator(close, 200).iloc[-1]
+    sma200 = ta.trend.sma_indicator(close, 200).iloc[-1]
 
     osc_signals = {
-        "RSI(14)": _vote(rsi_val < 30, rsi_val > 70),
-        "Stoch(14,3,3)": _vote(stoch_k.iloc[-1] < 20, stoch_k.iloc[-1] > 80),
-        "MACD": _vote(macd_l.iloc[-1] > macd_s.iloc[-1], macd_l.iloc[-1] < macd_s.iloc[-1]),
+        "RSI": _vote(rsi_val < 30, rsi_val > 70),
+        "Stoch": _vote(stoch_k < 20, stoch_k > 80),
+        "MACD": _vote(macd_l > macd_s, macd_l < macd_s),
     }
 
     ma_signals = {
         "EMA20": _vote(price > ema20, price < ema20),
         "EMA50": _vote(price > ema50, price < ema50),
         "SMA200": _vote(price > sma200, price < sma200),
+        "EMA200": _vote(price > ema200, price < ema200),
     }
 
     all_signals = list(osc_signals.values()) + list(ma_signals.values())
@@ -132,7 +148,18 @@ def _compute_analysis(df: pd.DataFrame, symbol: str, interval_name: str) -> Anal
         summary=summary,
         moving_averages=_tally(list(ma_signals.values())),
         oscillators=_tally(list(osc_signals.values())),
-        indicators={"close": price, "rsi": rsi_val, "ema50": ema50}
+        indicators={
+            "close": price,
+            "rsi": rsi_val,
+            "ema50": ema50,
+            "ema200": ema200,
+            "adx": adx,
+            "stoch_k": stoch_k,
+            "macd_l": macd_l,
+            "macd_s": macd_s,
+            "bb_h": bb_h,
+            "bb_l": bb_l
+        }
     )
 
 # ─────────────────────────────────────────────
