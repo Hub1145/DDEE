@@ -177,17 +177,29 @@ class StrategyHandler:
                 elif is_cross_down and fcast_final < current_price and rr >= 1.5:
                     echo_confirmed = True
 
-        # Signal Filtering
+        # Signal Filtering (Prioritize standard BUY/SELL over STRONG signals for crossovers)
         signal = None
+        is_exhaustion_risk = False
+
         if is_cross_up and echo_confirmed:
-            if "BUY" in ta_signal:
+            if ta_signal == "BUY":
                 signal = 'buy'
+            elif ta_signal == "STRONG_BUY":
+                signal = 'buy'
+                is_exhaustion_risk = True
         elif is_cross_down and echo_confirmed:
-            if "SELL" in ta_signal:
+            if ta_signal == "SELL":
                 signal = 'sell'
+            elif ta_signal == "STRONG_SELL":
+                signal = 'sell'
+                is_exhaustion_risk = True
 
         if signal:
-            self.bot.log(f"Strategy {strat_num} triggered {signal} for {symbol}. TA: {ta_signal}.")
+            msg = f"Strategy {strat_num} triggered {signal} for {symbol}. TA: {ta_signal}."
+            if is_exhaustion_risk:
+                msg += " (Note: Potential exhaustion risk with STRONG signal)"
+
+            self.bot.log(msg)
             self.bot._execute_trade(symbol, signal)
 
     def _process_strategy_4(self, symbol, is_candle_close):

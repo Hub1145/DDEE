@@ -185,17 +185,17 @@ function setupSocketListeners() {
             typeBadge.className = 'badge rounded-pill bg-danger ms-1';
         }
 
-        document.getElementById('balanceDisplay').textContent = `$${Number(data.total_balance || 0).toFixed(2)}`;
-        document.getElementById('totalPnlDisplay').textContent = `$${Number(data.net_profit || 0).toFixed(2)}`;
+        document.getElementById('balanceDisplay').textContent = `$${Number(data.total_balance || 0).toFixed(1)}`;
+        document.getElementById('totalPnlDisplay').textContent = `$${Number(data.net_profit || 0).toFixed(1)}`;
         document.getElementById('totalPnlDisplay').className = `stat-value ${data.net_profit >= 0 ? 'text-success' : 'text-danger'}`;
 
         document.getElementById('tradesCountDisplay').textContent = data.total_trades || 0;
-        document.getElementById('usedAmountDisplay').textContent = `$${Number(data.used_amount || 0).toFixed(2)}`;
-        document.getElementById('realizedPnlDisplay').textContent = `$${Number(data.net_trade_profit || 0).toFixed(2)}`;
-        document.getElementById('floatingPnlDisplay').textContent = `$${Number((data.net_profit || 0) - (data.net_trade_profit || 0)).toFixed(2)}`;
+        document.getElementById('usedAmountDisplay').textContent = `$${Number(data.used_amount || 0).toFixed(1)}`;
+        document.getElementById('realizedPnlDisplay').textContent = `$${Number(data.net_trade_profit || 0).toFixed(1)}`;
+        document.getElementById('floatingPnlDisplay').textContent = `$${Number((data.net_profit || 0) - (data.net_trade_profit || 0)).toFixed(1)}`;
 
         if (document.getElementById('winRateDisplay')) {
-            document.getElementById('winRateDisplay').textContent = `${data.win_rate || 0}%`;
+            document.getElementById('winRateDisplay').textContent = `${Number(data.win_rate || 0).toFixed(1)}%`;
         }
         if (document.getElementById('avgPnlDisplay')) {
             const avg = data.avg_pnl || 0;
@@ -369,14 +369,14 @@ function updateActiveTrades(trades) {
                 <div class="d-flex justify-content-between align-items-center">
                     <strong>${t.symbol || 'Unknown'} (${t.type || '???'})${statusLabel}${freerideLabel}</strong>
                     <div class="d-flex align-items-center gap-3">
-                        <span class="${pnl >= 0 ? 'text-success' : 'text-danger'} fw-bold">$${pnl.toFixed(2)}</span>
+                        <span class="${pnl >= 0 ? 'text-success' : 'text-danger'} fw-bold">$${pnl.toFixed(1)}</span>
                         <button class="btn btn-sm btn-outline-danger" onclick="closeTrade('${t.id}')" title="Close Trade">
                             <i class="bi bi-x-circle"></i>
                         </button>
                     </div>
                 </div>
                 <div class="small text-muted d-flex justify-content-between mt-1">
-                    <div>ID: ${t.id} | Entry: ${entry.toFixed(4)} | Stake: $${stake.toFixed(2)}</div>
+                    <div>ID: ${t.id} | Entry: ${entry.toFixed(4)} | Stake: $${stake.toFixed(1)}</div>
                     <div class="expiry-countdown text-warning" data-expiry="${t.expiry_time}">${formatCountdown(t.expiry_time)}</div>
                 </div>
             </div>
