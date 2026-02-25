@@ -38,16 +38,18 @@ A professional, high-frequency trading bot for Binance Futures that executes a c
     ```
 4.  **Access Dashboard**: Open `http://localhost:3000` in your browser.
 
-### ⚠️ Troubleshooting `ImportError: cannot import name 'Client' from 'binance'`
-If you encounter this error, it means you have a conflicting `binance` package installed. To fix it:
-1.  **Uninstall conflicting packages**:
+### ⚠️ CRITICAL: Fixing `ImportError: cannot import name 'Client' from 'binance'`
+If you see this error when running the bot, it means there is a naming conflict with another `binance` package on your system. **Follow these steps exactly to fix it:**
+
+1.  **Uninstall ALL conflicting packages**:
     ```bash
-    pip uninstall binance binance-python
+    pip uninstall binance binance-python python-binance
     ```
-2.  **Install the correct package**:
+2.  **Re-install ONLY the correct package**:
     ```bash
     pip install python-binance
     ```
+3.  **Verify**: Run `python -c "from binance import Client; print('Success')"`
 
 ---
 

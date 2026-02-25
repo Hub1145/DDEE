@@ -5,8 +5,18 @@ import threading
 import asyncio
 from datetime import datetime
 from collections import deque
-from binance import Client, ThreadedWebsocketManager
-from binance.exceptions import BinanceAPIException
+try:
+    from binance import Client, ThreadedWebsocketManager
+    from binance.exceptions import BinanceAPIException
+except ImportError:
+    print("\n" + "="*80)
+    print("CRITICAL IMPORT ERROR: 'Client' could not be imported from 'binance'.")
+    print("This usually means the wrong 'binance' package is installed.")
+    print("\nFIX:")
+    print("1. pip uninstall binance binance-python")
+    print("2. pip install python-binance")
+    print("="*80 + "\n")
+    raise
 
 class BinanceTradingBotEngine:
     def __init__(self, config_path, emit_callback):
