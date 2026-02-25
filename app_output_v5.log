@@ -1,0 +1,30 @@
+2026-02-25 22:40:59,824 - INFO - Bot started | Trading: OFF
+2026-02-25 22:40:59,826 - INFO - Screener background loop started
+2026-02-25 22:40:59,826 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:40:59,827 - INFO - History worker started
+2026-02-25 22:40:59,828 - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+ * Serving Flask app 'app'
+ * Debug mode: off
+2026-02-25 22:40:59,835 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.0.2:3000
+2026-02-25 22:40:59,835 - INFO - [33mPress CTRL+C to quit[0m
+2026-02-25 22:41:10,830 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:41:21,831 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:41:32,831 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:41:43,832 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:41:54,833 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:42:05,833 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:42:16,834 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:42:27,834 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:42:38,835 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:42:49,836 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:43:00,836 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:43:11,837 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:43:22,837 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:43:33,838 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:43:44,839 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:43:55,839 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:44:06,840 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:44:17,840 - INFO - Analyzing Strategy 5 for R_100

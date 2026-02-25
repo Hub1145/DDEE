@@ -273,7 +273,8 @@ async def fetch_candles(symbol: str, interval: str, count: int = 300) -> pd.Data
         df = pd.DataFrame(resp["candles"])
         df["epoch_dt"] = pd.to_datetime(df["epoch"], unit="s")
         df.set_index("epoch_dt", inplace=True)
-        df = df[["open", "high", "low", "close"]].astype(float)
+        # Keep epoch for utilities that might need it
+        df = df[["epoch", "open", "high", "low", "close"]].astype(float)
         _CANDLE_CACHE[cache_key] = (now, df)
         return df
     return pd.DataFrame()

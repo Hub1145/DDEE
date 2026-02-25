@@ -1,0 +1,110 @@
+2026-02-25 22:48:02,953 - INFO - Bot started | Trading: OFF
+2026-02-25 22:48:02,954 - INFO - Screener background loop started
+2026-02-25 22:48:02,955 - INFO - Analyzing Strategy 6 for R_100
+2026-02-25 22:48:02,955 - INFO - History worker started
+2026-02-25 22:48:02,956 - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+ * Serving Flask app 'app'
+ * Debug mode: off
+2026-02-25 22:48:02,961 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.0.2:3000
+2026-02-25 22:48:02,961 - INFO - [33mPress CTRL+C to quit[0m
+2026-02-25 22:48:13,956 - INFO - Analyzing Strategy 6 for R_100
+2026-02-25 22:48:24,958 - INFO - Analyzing Strategy 6 for R_100
+2026-02-25 22:48:34,973 - ERROR - Error in Strategy 6 analysis for R_100:
+Traceback (most recent call last):
+  File "/app/handlers/screener_handler.py", line 264, in analyze_strategy_6
+    df1m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1m"), manager.loop).result()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+TimeoutError
+2026-02-25 22:48:35,959 - INFO - Analyzing Strategy 6 for R_100
+2026-02-25 22:48:45,968 - ERROR - Error in Strategy 6 analysis for R_100:
+Traceback (most recent call last):
+  File "/app/handlers/screener_handler.py", line 264, in analyze_strategy_6
+    df1m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1m"), manager.loop).result()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+TimeoutError
+2026-02-25 22:48:46,960 - INFO - Analyzing Strategy 6 for R_100
+2026-02-25 22:48:56,969 - ERROR - Error in Strategy 6 analysis for R_100:
+Traceback (most recent call last):
+  File "/app/handlers/screener_handler.py", line 264, in analyze_strategy_6
+    df1m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1m"), manager.loop).result()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+TimeoutError
+2026-02-25 22:48:57,961 - INFO - Analyzing Strategy 6 for R_100
+2026-02-25 22:49:07,971 - ERROR - Error in Strategy 6 analysis for R_100:
+Traceback (most recent call last):
+  File "/app/handlers/screener_handler.py", line 264, in analyze_strategy_6
+    df1m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1m"), manager.loop).result()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+TimeoutError
+2026-02-25 22:49:08,961 - INFO - Analyzing Strategy 6 for R_100
+2026-02-25 22:49:18,973 - ERROR - Error in Strategy 6 analysis for R_100:
+Traceback (most recent call last):
+  File "/app/handlers/screener_handler.py", line 264, in analyze_strategy_6
+    df1m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1m"), manager.loop).result()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+TimeoutError
+2026-02-25 22:49:19,962 - INFO - Analyzing Strategy 6 for R_100
+2026-02-25 22:49:29,972 - ERROR - Error in Strategy 6 analysis for R_100:
+Traceback (most recent call last):
+  File "/app/handlers/screener_handler.py", line 264, in analyze_strategy_6
+    df1m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1m"), manager.loop).result()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+TimeoutError
+2026-02-25 22:49:30,962 - INFO - Analyzing Strategy 6 for R_100
+2026-02-25 22:49:40,974 - ERROR - Error in Strategy 6 analysis for R_100:
+Traceback (most recent call last):
+  File "/app/handlers/screener_handler.py", line 264, in analyze_strategy_6
+    df1m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1m"), manager.loop).result()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+TimeoutError
+2026-02-25 22:49:41,963 - INFO - Analyzing Strategy 6 for R_100
+2026-02-25 22:49:51,972 - ERROR - Error in Strategy 6 analysis for R_100:
+Traceback (most recent call last):
+  File "/app/handlers/screener_handler.py", line 264, in analyze_strategy_6
+    df1m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1m"), manager.loop).result()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 456, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/home/jules/.pyenv/versions/3.12.12/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+TimeoutError
+2026-02-25 22:49:52,964 - INFO - Analyzing Strategy 6 for R_100

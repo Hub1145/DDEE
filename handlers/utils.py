@@ -3,7 +3,10 @@ import ta
 import numpy as np
 
 def calculate_supertrend(df, period=10, multiplier=3):
-    atr = ta.volatility.average_true_range(df['high'], df['low'], df['close'], window=period)
+    if len(df) < period:
+        return pd.Series([0.0]*len(df), index=df.index), pd.Series([0.0]*len(df), index=df.index)
+
+    atr = ta.volatility.AverageTrueRange(df['high'], df['low'], df['close'], window=period).average_true_range()
     hl2 = (df['high'] + df['low']) / 2
     upperband = hl2 + (multiplier * atr)
     lowerband = hl2 - (multiplier * atr)
@@ -44,29 +47,30 @@ def calculate_supertrend(df, period=10, multiplier=3):
             else:
                 supertrend[i] = final_lowerband.iloc[i]
                 direction[i] = 1
-    return pd.Series(supertrend), pd.Series(direction)
+    return pd.Series(supertrend, index=df.index), pd.Series(direction, index=df.index)
 
 def calculate_fractals(df, window=2):
-    if len(df) < 2 * window + 1: return pd.Series([False]*len(df)), pd.Series([False]*len(df))
+    if len(df) < 2 * window + 1:
+        return pd.Series([False]*len(df), index=df.index), pd.Series([False]*len(df), index=df.index)
     highs = df['high']
     lows = df['low']
     is_high = [False] * len(df)
     is_low = [False] * len(df)
     for i in range(window, len(df) - window):
-        if all(highs.iloc[i] > highs.iloc[i-window:i]) and all(highs.iloc[i] > highs.iloc[i+1:i+window+1]):
-            is_high[i] = True
-        if all(lows.iloc[i] < lows.iloc[i-window:i]) and all(lows.iloc[i] < lows.iloc[i+1:i+window+1]):
-            is_low[i] = True
+        try:
+            if all(highs.iloc[i] > highs.iloc[i-window:i]) and all(highs.iloc[i] > highs.iloc[i+1:i+window+1]):
+                is_high[i] = True
+            if all(lows.iloc[i] < lows.iloc[i-window:i]) and all(lows.iloc[i] < lows.iloc[i+1:i+window+1]):
+                is_low[i] = True
+        except: continue
     return pd.Series(is_high, index=df.index), pd.Series(is_low, index=df.index)
 
 def calculate_pivot_points(df, left=15, right=15):
     """
     Identifies LuxAlgo-style pivot highs and lows.
-    A pivot high is a peak where the high of a bar is higher than the highs of
-    'left' bars before it and 'right' bars after it.
     """
     if len(df) < (left + right + 1):
-        return pd.Series([False]*len(df)), pd.Series([False]*len(df))
+        return pd.Series([False]*len(df), index=df.index), pd.Series([False]*len(df), index=df.index)
 
     highs = df['high'].values
     lows = df['low'].values
@@ -77,35 +81,35 @@ def calculate_pivot_points(df, left=15, right=15):
     for i in range(left, len(df) - right):
         # Pivot High
         val_h = highs[i]
-        is_high = True
+        if np.isnan(val_h): continue
+        is_h = True
         for j in range(i - left, i):
             if highs[j] > val_h:
-                is_high = False
+                is_h = False
                 break
-        if is_high:
+        if is_h:
             for j in range(i + 1, i + right + 1):
                 if highs[j] >= val_h:
-                    is_high = False
+                    is_h = False
                     break
-        if is_high:
-            pivot_highs[i] = True
+        if is_h: pivot_highs[i] = True
 
         # Pivot Low
         val_l = lows[i]
-        is_low = True
+        if np.isnan(val_l): continue
+        is_l = True
         for j in range(i - left, i):
             if lows[j] < val_l:
-                is_low = False
+                is_l = False
                 break
-        if is_low:
+        if is_l:
             for j in range(i + 1, i + right + 1):
                 if lows[j] <= val_l:
-                    is_low = False
+                    is_l = False
                     break
-        if is_low:
-            pivot_lows[i] = True
+        if is_l: pivot_lows[i] = True
 
-    return pd.Series(pivot_highs), pd.Series(pivot_lows)
+    return pd.Series(pivot_highs, index=df.index), pd.Series(pivot_lows, index=df.index)
 
 def calculate_order_blocks(df, lookback=100):
     if len(df) < lookback: return []
@@ -353,14 +357,12 @@ def get_smart_multiplier(atr_pct, base_multiplier=100):
 def predict_expiry_v5(symbol, strategy_key, ltf_min, htf_min, confidence, fcast_data, df_ltf, direction='NEUTRAL'):
     """
     Expert Intelligence Expiry Engine (v5.1 Enhanced with Echo Arrival Logic).
-    Predicts optimal duration based on the confidence that price will reach an ATR target
-    within the forecasted structural window.
     """
     # 1. Base Intelligence from ATR Speed
     atr = 0
     curr_price = 0
-    if df_ltf is not None and not df_ltf.empty:
-        atr_series = ta.volatility.average_true_range(df_ltf['high'], df_ltf['low'], df_ltf['close'], window=14)
+    if df_ltf is not None and len(df_ltf) >= 14:
+        atr_series = ta.volatility.AverageTrueRange(df_ltf['high'], df_ltf['low'], df_ltf['close'], window=14).average_true_range()
         atr = atr_series.iloc[-1]
         curr_price = df_ltf['close'].iloc[-1]
 
@@ -428,8 +430,8 @@ def predict_expiry_v5(symbol, strategy_key, ltf_min, htf_min, confidence, fcast_
             else: base_expiry = 30
 
     # Fine-tune Volatility
-    if atr > 0 and df_ltf is not None and not df_ltf.empty:
-        avg_atr = ta.volatility.average_true_range(df_ltf['high'], df_ltf['low'], df_ltf['close'], window=50).mean()
+    if atr > 0 and df_ltf is not None and len(df_ltf) >= 50:
+        avg_atr = ta.volatility.AverageTrueRange(df_ltf['high'], df_ltf['low'], df_ltf['close'], window=50).average_true_range().mean()
         if avg_atr > 0:
             ratio = atr / avg_atr
             if ratio > 1.5: base_expiry = max(1, int(base_expiry * 0.7))

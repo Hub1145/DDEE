@@ -197,7 +197,7 @@ class StrategyHandler:
                 fcast_final = fcast_prices[-1]
 
                 # Get ATR for risk floor
-                atr = ta.volatility.average_true_range(ltf_df['high'], ltf_df['low'], ltf_df['close'], window=14).iloc[-1]
+                atr = ta.volatility.AverageTrueRange(ltf_df['high'], ltf_df['low'], ltf_df['close'], window=14).average_true_range().iloc[-1]
                 direction = "BUY" if is_cross_up else "SELL"
                 rr = calculate_structural_rr(current_price, fcast_prices, direction, atr)
 
@@ -298,10 +298,10 @@ class StrategyHandler:
         # Strategy 4 Echo & Structural RR confirmation
         if signal:
             ltf_df = pd.DataFrame(sd.get('ltf_candles', []))
-            if not ltf_df.empty:
+            if len(ltf_df) >= 14:
                 fcast_prices, correlation = calculate_echo_forecast(ltf_df)
                 if fcast_prices and correlation > 0.5:
-                    atr = ta.volatility.average_true_range(ltf_df['high'], ltf_df['low'], ltf_df['close'], window=14).iloc[-1]
+                    atr = ta.volatility.AverageTrueRange(ltf_df['high'], ltf_df['low'], ltf_df['close'], window=14).average_true_range().iloc[-1]
                     rr = calculate_structural_rr(current_price, fcast_prices, signal, atr)
 
                     if signal == 'buy':

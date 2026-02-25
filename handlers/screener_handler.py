@@ -153,12 +153,15 @@ class ScreenerHandler:
             if macd_div == 1: mom_score += 15
             elif macd_div == -1: mom_score -= 15
 
-            # Volatility Block: ATR, Bollinger Bands
-            bb_h = ind5m.get('bb_h', 0)
-            bb_l = ind5m.get('bb_l', 0)
-            vol_score = 0
-            if price_1h > bb_h: vol_score += 5
-            elif price_1h < bb_l: vol_score -= 5
+            # Volatility Block: ATR Relative (v5.3)
+            atr_5m = ta.volatility.AverageTrueRange(df5m['high'], df5m['low'], df5m['close'], window=14).average_true_range()
+            atr_curr = atr_5m.iloc[-1]
+            atr_avg = atr_5m.rolling(50).mean().iloc[-1]
+            vol_rel = (atr_curr / atr_avg) if atr_avg else 1.0
+
+            # Map volatility to score (0.5x to 1.5x ATR map to -5 to +5)
+            vol_score = (vol_rel - 1.0) * 10
+            vol_score = max(-5, min(5, vol_score))
 
             # Structure Block: 5m Fractals (Scalp) or 1H Order Blocks (Multiplier)
             is_multiplier = self.bot.config.get('contract_type') == 'multiplier'
@@ -166,21 +169,23 @@ class ScreenerHandler:
             if is_multiplier:
                 obs = calculate_order_blocks(df1h)
                 for ob in obs:
-                    if ob['type'] == 'Bullish OB' and abs(price_1h - ob['price'])/ob['price'] < 0.005:
-                        struct_score += 20
-                    elif ob['type'] == 'Bearish OB' and abs(price_1h - ob['price'])/ob['price'] < 0.005:
-                        struct_score -= 20
+                    dist = abs(price_1h - ob['price'])/ob['price']
+                    if dist < 0.01:
+                        weight = 20 * (1 - dist/0.01)
+                        if ob['type'] == 'Bullish OB': struct_score += weight
+                        else: struct_score -= weight
             else:
                 f_high, f_low = calculate_fractals(df5m)
-                if f_low.iloc[-1]: struct_score += 15
-                elif f_high.iloc[-1]: struct_score -= 15
+                # Recent fractal lookback
+                if any(f_low.tail(3)): struct_score += 15
+                elif any(f_high.tail(3)): struct_score -= 15
 
             # Normalization and Confidence (Weights: Trend 40%, Momentum 30%, Vol 10%, Struct 20%)
             # We map scores to a 0.0 - 10.0 range for the UI
-            norm_trend = 5.0 + (trend_score / 8.0) # trend_score is +/- 40 max
-            norm_mom = 5.0 + (mom_score / 7.0)   # mom_score is +/- 35 max
-            norm_vol = 5.0 + (vol_score)        # vol_score is +/- 5 max
-            norm_struct = 5.0 + (struct_score / 4.0) # struct_score is +/- 20 max
+            norm_trend = max(0.0, min(10.0, 5.0 + (trend_score / 8.0)))
+            norm_mom = max(0.0, min(10.0, 5.0 + (mom_score / 7.0)))
+            norm_vol = max(0.0, min(10.0, 5.0 + (vol_score)))
+            norm_struct = max(0.0, min(10.0, 5.0 + (struct_score / 4.0)))
 
             # Total Confidence Calculation
             total_raw = trend_score + mom_score + vol_score + struct_score
@@ -246,7 +251,7 @@ class ScreenerHandler:
             self.bot.emit('screener_update', {'symbol': symbol, 'data': data})
             return data
         except Exception as e:
-            logging.error(f"Error in Strategy 5 analysis for {symbol}: {e}")
+            logging.error(f"Error in Strategy 5 analysis for {symbol}: {e}", exc_info=True)
             return None
 
     def analyze_strategy_6(self, symbol):
@@ -282,18 +287,30 @@ class ScreenerHandler:
             else: mom_score -= 1
             mom_final = mom_score * 2
 
-            # Volatility Score (Weight 1)
+            # Volatility Score (Weight 1) - Based on BB position
+            bb_h = ind1m.get('bb_h', 0)
+            bb_l = ind1m.get('bb_l', 0)
+            price = ind1m.get('close', 0)
             vol_score = 0
-            if ind1m.get('close') > ind1m.get('bb_h'): vol_score += 1
-            elif ind1m.get('close') < ind1m.get('bb_l'): vol_score -= 1
-            vol_final = vol_score * 1
+            if bb_h > bb_l:
+                # 1.0 at upper band, -1.0 at lower band
+                vol_score = (price - (bb_h + bb_l)/2) / (bb_h - bb_l) * 2
+            vol_final = max(-1, min(1, vol_score)) * 1
 
             # Structure Score (Weight 2)
             struct_score = 0
             macd_div = detect_macd_divergence(df1h)
             if macd_div == 1: struct_score += 1
             elif macd_div == -1: struct_score -= 1
-            struct_final = struct_score * 2
+
+            # Add SNR proximity to Strategy 6 structure
+            snr_zones = calculate_snr_zones(symbol, self.bot.symbol_data.get(symbol), 3600)
+            for z in snr_zones:
+                if abs(price - z['price'])/price < 0.002:
+                    if z['type'] == 'S': struct_score += 0.5
+                    elif z['type'] == 'R': struct_score -= 0.5
+
+            struct_final = max(-1, min(1, struct_score)) * 2
 
             # Normalize confidence (max possible absolute score is 3*3 + 2*2 + 1*1 + 1*2 = 16)
             total_score = trend_final + mom_final + vol_final + struct_final
@@ -305,10 +322,10 @@ class ScreenerHandler:
                 signal = "BUY" if total_score > 0 else "SELL"
 
             # Normalize scores for UI (0-10)
-            norm_trend = 5.0 + (trend_score * 1.6) # +/- 3 * 1.6 = +/- 4.8
-            norm_mom = 5.0 + (mom_score * 2.5)   # +/- 2 * 2.5 = +/- 5.0
-            norm_vol = 5.0 + (vol_score * 5.0)   # +/- 1 * 5.0 = +/- 5.0
-            norm_struct = 5.0 + (struct_score * 5.0) # +/- 1 * 5.0 = +/- 5.0
+            norm_trend = max(0.0, min(10.0, 5.0 + (trend_score * 1.6)))
+            norm_mom = max(0.0, min(10.0, 5.0 + (mom_score * 2.5)))
+            norm_vol = max(0.0, min(10.0, 5.0 + (vol_score * 5.0)))
+            norm_struct = max(0.0, min(10.0, 5.0 + (struct_score * 5.0)))
 
             # Echo Forecast validation
             fcast_prices, correlation = calculate_echo_forecast(df1h)
@@ -352,7 +369,7 @@ class ScreenerHandler:
             self.bot.emit('screener_update', {'symbol': symbol, 'data': data})
             return data
         except Exception as e:
-            logging.error(f"Error in Strategy 6 analysis for {symbol}: {e}")
+            logging.error(f"Error in Strategy 6 analysis for {symbol}: {e}", exc_info=True)
             return None
 
     def update_strat7_analysis(self, symbol, config):
@@ -495,6 +512,11 @@ class ScreenerHandler:
         try:
             sd = self.bot.symbol_data.get(symbol, {})
             df1m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "1m"), manager.loop).result()
+            df5m = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, "5m"), manager.loop).result()
+
+            # Calculate generic scores for display consistency
+            ind5m = get_ta_indicators(symbol, "5m")
+            trend, momentum, volatility, structure = self._calculate_scores(symbol, ind5m, df5m)
 
             fcast_prices, correlation = calculate_echo_forecast(df1m)
 
@@ -521,6 +543,7 @@ class ScreenerHandler:
                 'expiry_min': expiry,
                 'expiry_countdown': expiry * 60,
                 'atr': round(atr_val, 4),
+                'trend': trend, 'momentum': momentum, 'volatility': volatility, 'structure': structure,
                 'trend_rec': echo_dir,
                 'fcast_data': fcast_data,
                 'last_update': time.time()
@@ -535,6 +558,10 @@ class ScreenerHandler:
     def analyze_crossover_strategy(self, symbol, strat_num, ta_interval, htf_sec):
         ta_signal = get_ta_signal(symbol, ta_interval)
         indicators = get_ta_indicators(symbol, ta_interval)
+
+        # Consistent scores for display
+        df_ta = asyncio.run_coroutine_threadsafe(fetch_candles(symbol, ta_interval), manager.loop).result()
+        trend, momentum, volatility, structure = self._calculate_scores(symbol, indicators, df_ta)
 
         sd = self.bot.symbol_data.get(symbol, {})
         htf_open = sd.get('htf_open')
@@ -581,6 +608,7 @@ class ScreenerHandler:
             'expiry_min': countdown // 60,
             'expiry_countdown': countdown,
             'atr': round(atr_val, 4),
+            'trend': trend, 'momentum': momentum, 'volatility': volatility, 'structure': structure,
             'trend_rec': ta_signal,
             'fcast_data': fcast_data,
             'last_update': time.time()

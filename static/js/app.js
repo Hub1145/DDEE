@@ -14,6 +14,11 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function updateConfigLabels(strategyOverride = null) {
+    // Clear screener data when configuration changes to ensure fresh readings for new mode
+    window.screenerDataMap = {};
+    const body = document.getElementById('screenerTableBody');
+    if (body) body.innerHTML = '<tr><td colspan="12" class="text-center text-muted">Mode changed. Waiting for data...</td></tr>';
+
     // Entry Type Label
     const strategySelect = document.getElementById('configActiveStrategy');
     if (strategySelect || strategyOverride) {
@@ -66,6 +71,14 @@ function updateConfigLabels(strategyOverride = null) {
         }
         // Always refresh table headers/layout when strategy changes
         updateScreenerTable(null, null);
+
+    // Update Screener Mode Badge
+    const contractType = document.getElementById('configContractType').value;
+    const modeBadge = document.getElementById('screenerModeBadge');
+    if (modeBadge) {
+        modeBadge.textContent = contractType === 'multiplier' ? 'Multiplier' : 'Rise & Fall';
+        modeBadge.className = `badge ${contractType === 'multiplier' ? 'bg-warning text-dark' : 'bg-primary'}`;
+    }
     }
 
     // TP/SL Unit Labels
@@ -329,6 +342,12 @@ function updateScreenerTable(symbol, data) {
             col4 = d.direction === 'CALL' ? '<span class="text-success fw-bold">Above Open</span>' : (d.direction === 'PUT' ? '<span class="text-danger fw-bold">Below Open</span>' : '<span class="text-muted">Neutral</span>');
         } else {
             recValue = `${countdownHtml}${sessionTag} | ${d.atr || "0.00"}`;
+            // Format scores for Strategies 5, 6, 4
+            const getScoreClass = (v) => v >= 7 ? 'text-success' : (v <= 3 ? 'text-danger' : 'text-warning');
+            col1 = `<span class="${getScoreClass(d.trend)} fw-bold">${d.trend || 0}</span>`;
+            col2 = `<span class="${getScoreClass(d.momentum)} fw-bold">${d.momentum || 0}</span>`;
+            col3 = `<span class="${getScoreClass(d.volatility)} fw-bold">${d.volatility || 0}</span>`;
+            col4 = `<span class="${getScoreClass(d.structure)} fw-bold">${d.structure || 0}</span>`;
         }
 
         const displayConf = d.label ? `${d.label} (${d.confidence}%)` : `${d.confidence}%`;
@@ -342,11 +361,12 @@ function updateScreenerTable(symbol, data) {
             echoHtml = `<span class="${eColor} fw-bold">${eDir}</span> <small class="text-muted">(${d.fcast_data.correlation.toFixed(2)})</small>`;
         }
 
-        // TP/SL/RR Column
-        let tpslHtml = '<span class="text-muted">N/A</span>';
-        if (d.tp && d.sl) {
-            tpslHtml = `T:${d.tp}<br>S:${d.sl}<br><small class="text-info">RR:${d.rr || 0}</small>`;
-        }
+        // TP Column
+        let tpHtml = d.tp ? `<span class="text-primary">${Number(d.tp).toFixed(4)}</span>` : '<span class="text-muted">-</span>';
+        // SL Column
+        let slHtml = d.sl ? `<span class="text-danger">${Number(d.sl).toFixed(4)}</span>` : '<span class="text-muted">-</span>';
+        // RR Column
+        let rrHtml = d.rr ? `<span class="text-info fw-bold">${Number(d.rr).toFixed(2)}</span>` : '<span class="text-muted">-</span>';
 
         // Final Signal Label
         let signalLabelHtml = `<span class="badge ${d.signal === 'BUY' ? 'bg-success' : (d.signal === 'SELL' ? 'bg-danger' : 'bg-secondary')}">${d.signal}</span>`;
@@ -358,7 +378,9 @@ function updateScreenerTable(symbol, data) {
                 <td class="${dirColor} fw-bold">${signalLabelHtml} / ${directionLabel}</td>
                 <td><small>${recValue}</small></td>
                 <td><small>${echoHtml}</small></td>
-                <td><small>${tpslHtml}</small></td>
+                <td><small>${tpHtml}</small></td>
+                <td><small>${slHtml}</small></td>
+                <td><small>${rrHtml}</small></td>
                 <td style="${(activeStrategy === 'strategy_7' && isSmallOff) || isStrat123 ? 'display:none' : ''}">${col1}</td>
                 <td style="${(activeStrategy === 'strategy_7' && isMidOff) || isStrat123 ? 'display:none' : ''}">${col2}</td>
                 <td style="${(activeStrategy === 'strategy_7' && isHighOff) || isStrat123 ? 'display:none' : ''}">${col3}</td>
