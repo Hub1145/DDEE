@@ -55,10 +55,12 @@ def update_config():
         allowed_params = [
             'deriv_api_token', 'deriv_app_id', 'symbols',
             'use_fixed_balance', 'balance_value', 'max_daily_loss_pct',
+            'max_daily_profit_pct',
             'entry_type', 'is_demo', 'log_level',
             'tp_enabled', 'tp_value', 'sl_enabled', 'sl_value',
             'force_close_enabled', 'force_close_duration',
-            'active_strategy', 'contract_type', 'multiplier_value', 'custom_expiry'
+            'active_strategy', 'contract_type', 'multiplier_value', 'custom_expiry',
+            'strat7_small_tf', 'strat7_mid_tf', 'strat7_high_tf'
         ]
 
         # Update current_config with only allowed and present keys from new_config
@@ -77,10 +79,12 @@ def update_config():
         
         if updates_made:
             save_config(current_config)
+            logging.info(f"Config updates made. updates_made=True. bot_engine is {'NOT ' if not bot_engine else ''}None")
 
             warning_msg = None
             if bot_engine:
                 # Update the bot's internal config object and trigger dynamic updates
+                logging.info("Calling bot_engine.apply_live_config_update")
                 result = bot_engine.apply_live_config_update(current_config)
                 if result.get('warnings'):
                     warning_msg = " | ".join(result['warnings'])

@@ -90,8 +90,8 @@
             background: rgba(255, 255, 255, 0.05);
         }
 
-        .trade-card.buy { border-left-color: #28a745; }
-        .trade-card.sell { border-left-color: #dc3545; }
+        .trade-card.buy, .trade-card.long { border-left-color: #28a745; }
+        .trade-card.sell, .trade-card.short { border-left-color: #dc3545; }
     </style>
 </head>
 
@@ -220,18 +220,26 @@
 
                     <!-- Screener Tab -->
                     <div class="tab-pane fade" id="screenerTab">
+                        <div class="d-flex justify-content-between align-items-center mb-2 px-2">
+                            <h6 class="mb-0">Market Monitoring</h6>
+                            <span class="badge bg-primary" id="screenerModeBadge">Rise & Fall</span>
+                        </div>
                         <div class="table-responsive">
-                            <table class="table table-dark table-striped table-hover mt-2">
+                            <table class="table table-dark table-striped table-hover">
                                 <thead id="screenerTableHeader">
                                     <tr id="screenerHeaderRow">
                                         <th>Symbol</th>
-                                        <th>Confidence / Threshold</th>
-                                        <th>Direction</th>
-                                        <th id="screenerRecHeader">Recommendation</th>
+                                        <th>Conf / Thres</th>
+                                        <th>Signal / Direction</th>
+                                        <th id="screenerRecHeader">Expiry | ATR</th>
+                                        <th id="screenerEchoHeader">Echo Forecast</th>
+                                        <th>TP</th>
+                                        <th>SL</th>
+                                        <th>RR</th>
                                         <th class="screener-dynamic-col" data-col="1">Trend</th>
-                                        <th class="screener-dynamic-col" data-col="2">Momentum</th>
-                                        <th class="screener-dynamic-col" data-col="3">Volatility</th>
-                                        <th class="screener-dynamic-col" data-col="4">Structure</th>
+                                        <th class="screener-dynamic-col" data-col="2">Mom</th>
+                                        <th class="screener-dynamic-col" data-col="3">Vol</th>
+                                        <th class="screener-dynamic-col" data-col="4">Struct</th>
                                     </tr>
                                 </thead>
                                 <tbody id="screenerTableBody">
@@ -289,9 +297,15 @@
                         </div>
                         <div class="form-text">Uncheck for % of balance.</div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Max Daily Loss (%)</label>
-                        <input type="number" class="form-control" id="configMaxDailyLoss">
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Max Daily Loss (%)</label>
+                            <input type="number" class="form-control" id="configMaxDailyLoss">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Max Daily Profit (%)</label>
+                            <input type="number" class="form-control" id="configMaxDailyProfit">
+                        </div>
                     </div>
                     <hr>
                     <div class="row g-2 mb-3">
@@ -317,10 +331,10 @@
                     <div class="mb-3">
                         <label class="form-label">Trading Strategy</label>
                         <select class="form-select" id="configActiveStrategy">
-                            <option value="strategy_1">Slow (Daily / 1h)</option>
+                            <option value="strategy_1">Slow (Daily / 15m)</option>
                             <option value="strategy_2">Moderate (1h / 3m)</option>
                             <option value="strategy_3">Fast (15m / 1m)</option>
-                            <option value="strategy_4">Pure Price Action (5m / 1m)</option>
+                            <option value="strategy_4">LuxAlgo SNR (5m / 1m)</option>
                             <option value="strategy_5">Intelligence Screener v2.1 (Synthetic Optimized)</option>
                             <option value="strategy_6">Intelligence Legacy v1.0 (Exhaustive Indicator Suite)</option>
                             <option value="strategy_7">Intelligent Multi-TF Alignment (Custom 3-TF)</option>
@@ -331,6 +345,7 @@
                             <div class="col-4">
                                 <label class="form-label">Small TF</label>
                                 <select class="form-select" id="configStrat7SmallTF">
+                                    <option value="OFF">OFF</option>
                                     <option value="60">1m</option>
                                     <option value="120">2m</option>
                                     <option value="180">3m</option>
@@ -340,6 +355,7 @@
                             <div class="col-4">
                                 <label class="form-label">Mid TF</label>
                                 <select class="form-select" id="configStrat7MidTF">
+                                    <option value="OFF">OFF</option>
                                     <option value="300" selected>5m</option>
                                     <option value="900">15m</option>
                                     <option value="1800">30m</option>
@@ -349,6 +365,7 @@
                             <div class="col-4">
                                 <label class="form-label">High TF</label>
                                 <select class="form-select" id="configStrat7HighTF">
+                                    <option value="OFF">OFF</option>
                                     <option value="3600" selected>1h</option>
                                     <option value="7200">2h</option>
                                     <option value="14400">4h</option>

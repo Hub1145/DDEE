@@ -1,0 +1,29 @@
+2026-02-25 22:44:30,558 - INFO - Bot started | Trading: OFF
+2026-02-25 22:44:30,559 - INFO - Screener background loop started
+2026-02-25 22:44:30,560 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:44:30,561 - INFO - History worker started
+2026-02-25 22:44:30,562 - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+ * Serving Flask app 'app'
+ * Debug mode: off
+2026-02-25 22:44:30,566 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.0.2:3000
+2026-02-25 22:44:30,566 - INFO - [33mPress CTRL+C to quit[0m
+2026-02-25 22:44:31,323 - INFO - Strategy 5 update emitted for R_100: Conf=26.7%
+2026-02-25 22:44:41,561 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:44:41,701 - INFO - Strategy 5 update emitted for R_100: Conf=26.7%
+2026-02-25 22:44:52,561 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:44:52,701 - INFO - Strategy 5 update emitted for R_100: Conf=26.7%
+2026-02-25 22:45:03,562 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:45:03,899 - INFO - Strategy 5 update emitted for R_100: Conf=26.7%
+2026-02-25 22:45:14,563 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:45:14,702 - INFO - Strategy 5 update emitted for R_100: Conf=26.7%
+2026-02-25 22:45:25,563 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:45:25,697 - INFO - Strategy 5 update emitted for R_100: Conf=26.7%
+2026-02-25 22:45:36,564 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:45:36,899 - INFO - Strategy 5 update emitted for R_100: Conf=26.7%
+2026-02-25 22:45:47,564 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:45:47,699 - INFO - Strategy 5 update emitted for R_100: Conf=26.7%
+2026-02-25 22:45:58,565 - INFO - Analyzing Strategy 5 for R_100
+2026-02-25 22:45:58,702 - INFO - Strategy 5 update emitted for R_100: Conf=26.7%

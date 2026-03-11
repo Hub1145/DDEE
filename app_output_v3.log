@@ -1,0 +1,45 @@
+2026-02-25 21:34:20,717 - INFO - Bot started | Trading: OFF
+2026-02-25 21:34:20,719 - INFO - Screener background loop started
+2026-02-25 21:34:20,721 - INFO - History worker started
+2026-02-25 21:34:20,721 - WARNING - Werkzeug appears to be used in a production deployment. Consider switching to a production web server instead.
+ * Serving Flask app 'app'
+ * Debug mode: off
+2026-02-25 21:34:20,727 - INFO - [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:3000
+ * Running on http://192.168.0.2:3000
+2026-02-25 21:34:20,727 - INFO - [33mPress CTRL+C to quit[0m
+2026-02-25 21:35:54,846 - INFO - 127.0.0.1 - - [25/Feb/2026 21:35:54] "GET / HTTP/1.1" 200 -
+2026-02-25 21:35:54,897 - INFO - 127.0.0.1 - - [25/Feb/2026 21:35:54] "GET /static/js/app.js HTTP/1.1" 200 -
+2026-02-25 21:35:55,165 - INFO - 127.0.0.1 - - [25/Feb/2026 21:35:55] "GET /socket.io/?EIO=4&transport=polling&t=PoMkjx_ HTTP/1.1" 200 -
+2026-02-25 21:35:55,174 - INFO - 127.0.0.1 - - [25/Feb/2026 21:35:55] "GET /api/config HTTP/1.1" 200 -
+2026-02-25 21:35:55,183 - INFO - Client connected: XkHAo6OJnR2qtA9uAAAB
+2026-02-25 21:35:55,186 - INFO - 127.0.0.1 - - [25/Feb/2026 21:35:55] "POST /socket.io/?EIO=4&transport=polling&t=PoMkjye&sid=ZH_bcl7Q1fnHYX4wAAAA HTTP/1.1" 200 -
+2026-02-25 21:35:55,198 - INFO - 127.0.0.1 - - [25/Feb/2026 21:35:55] "GET /socket.io/?EIO=4&transport=polling&t=PoMkjyl&sid=ZH_bcl7Q1fnHYX4wAAAA HTTP/1.1" 200 -
+2026-02-25 21:35:55,223 - INFO - 127.0.0.1 - - [25/Feb/2026 21:35:55] "GET /socket.io/?EIO=4&transport=polling&t=PoMkjzE&sid=ZH_bcl7Q1fnHYX4wAAAA HTTP/1.1" 200 -
+2026-02-25 21:36:05,500 - INFO - Client disconnected
+2026-02-25 21:36:05,501 - INFO - 127.0.0.1 - - [25/Feb/2026 21:36:05] "GET /socket.io/?EIO=4&transport=websocket&sid=ZH_bcl7Q1fnHYX4wAAAA HTTP/1.1" 200 -
+2026-02-25 21:37:32,154 - INFO - 127.0.0.1 - - [25/Feb/2026 21:37:32] "GET / HTTP/1.1" 200 -
+2026-02-25 21:37:32,168 - INFO - 127.0.0.1 - - [25/Feb/2026 21:37:32] "GET /static/js/app.js HTTP/1.1" 200 -
+2026-02-25 21:37:32,291 - INFO - 127.0.0.1 - - [25/Feb/2026 21:37:32] "GET /socket.io/?EIO=4&transport=polling&t=PoMl5f- HTTP/1.1" 200 -
+2026-02-25 21:37:32,296 - INFO - 127.0.0.1 - - [25/Feb/2026 21:37:32] "GET /api/config HTTP/1.1" 200 -
+2026-02-25 21:37:32,306 - INFO - Client connected: nfpno0mpW-7B5m-mAAAD
+2026-02-25 21:37:32,307 - INFO - 127.0.0.1 - - [25/Feb/2026 21:37:32] "POST /socket.io/?EIO=4&transport=polling&t=PoMl5g9&sid=X6VAnCvvlqsEFdIAAAAC HTTP/1.1" 200 -
+2026-02-25 21:37:32,308 - INFO - 127.0.0.1 - - [25/Feb/2026 21:37:32] "GET /socket.io/?EIO=4&transport=polling&t=PoMl5gC&sid=X6VAnCvvlqsEFdIAAAAC HTTP/1.1" 200 -
+2026-02-25 21:37:39,491 - INFO - Config updates made. updates_made=True. bot_engine is None
+2026-02-25 21:37:39,491 - INFO - Calling bot_engine.apply_live_config_update
+2026-02-25 21:37:39,491 - INFO - Config applied live
+2026-02-25 21:37:39,491 - INFO - Configuration updated live from dashboard.
+2026-02-25 21:37:39,492 - INFO - Bot started | Trading: OFF
+2026-02-25 21:37:39,493 - INFO - 127.0.0.1 - - [25/Feb/2026 21:37:39] "POST /api/config HTTP/1.1" 200 -
+2026-02-25 21:37:46,647 - INFO - Client disconnected
+2026-02-25 21:37:46,648 - INFO - 127.0.0.1 - - [25/Feb/2026 21:37:46] "GET /socket.io/?EIO=4&transport=websocket&sid=X6VAnCvvlqsEFdIAAAAC HTTP/1.1" 200 -
+2026-02-25 21:37:49,848 - ERROR - Error in Strategy 5 analysis for R_100: 'epoch'
+2026-02-25 21:38:00,825 - ERROR - Error in Strategy 5 analysis for R_100: 'epoch'
+2026-02-25 21:38:12,052 - ERROR - Error in Strategy 5 analysis for R_100: 'epoch'
+2026-02-25 21:38:22,825 - ERROR - Error in Strategy 5 analysis for R_100: 'epoch'
+2026-02-25 21:38:33,825 - ERROR - Error in Strategy 5 analysis for R_100: 'epoch'
+2026-02-25 21:38:45,065 - ERROR - Error in Strategy 5 analysis for R_100: 'epoch'
+2026-02-25 21:38:55,826 - ERROR - Error in Strategy 5 analysis for R_100: 'epoch'
+2026-02-25 21:39:06,829 - ERROR - Error in Strategy 5 analysis for R_100: 'epoch'
+2026-02-25 21:39:18,062 - ERROR - Error in Strategy 5 analysis for R_100: 'epoch'
